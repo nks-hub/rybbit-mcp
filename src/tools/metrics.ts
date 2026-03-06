@@ -31,7 +31,7 @@ export function registerMetricsTools(
     {
       title: "Metric Breakdown",
       description:
-        "Get metric breakdown by dimension (browser, OS, country, page, referrer, UTM params, etc.). Returns sorted list with counts, percentages, and optional page-level stats like bounce rate and time on page.",
+        "Get metric breakdown by dimension. Use parameter='pathname' for top pages, 'browser'/'operating_system'/'device_type' for tech stats, 'country'/'city' for geo, 'utm_source'/'utm_campaign' for marketing, 'referrer'/'channel' for traffic sources, 'entry_page'/'exit_page' for user flow. Returns sorted list with counts, percentages, bounce rate, and session duration.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,

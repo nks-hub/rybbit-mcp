@@ -98,7 +98,7 @@ export function registerSessionsTools(
     {
       title: "Session Detail",
       description:
-        "Get detailed session information including all page views, events, user traits, device info, location, and full event timeline.",
+        "Get detailed session information including all page views, events, user traits, device info, location, and full event timeline. Use rybbit_list_sessions first to find session IDs.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,

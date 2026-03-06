@@ -26,7 +26,7 @@ export function registerErrorsTools(
     {
       title: "Error Tracking",
       description:
-        "Get error tracking data. Use type='names' to see error types and counts, or type='events' to see individual error instances with stack traces and context.",
+        "Get error tracking data. Workflow: (1) type='names' to see error types and counts, (2) type='events' with errorMessage to see individual instances with stack traces, (3) type='timeseries' with errorMessage to see trends over time.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,

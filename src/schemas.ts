@@ -48,7 +48,7 @@ export const analyticsInputSchema = {
   filters: z
     .array(filterSchema)
     .optional()
-    .describe("Array of filters to apply"),
+    .describe("Array of filters. Example: [{parameter:'browser',type:'equals',value:['Chrome']},{parameter:'country',type:'equals',value:['US','DE']}]"),
   pastMinutesStart: z
     .number()
     .optional()
@@ -72,17 +72,17 @@ export const bucketSchema = z
     "year",
   ])
   .optional()
-  .describe("Time bucket granularity for time-series data");
+  .describe("Time bucket granularity (default: day). Use 'hour' for last 24h, 'week'/'month' for long ranges");
 
 export const paginationSchema = {
-  page: z.number().int().min(1).optional().describe("Page number (1-indexed)"),
+  page: z.number().int().min(1).optional().describe("Page number, 1-indexed (default: 1)"),
   limit: z
     .number()
     .int()
     .min(1)
     .max(200)
     .optional()
-    .describe("Results per page (max 200)"),
+    .describe("Results per page (default: 20-50 depending on endpoint, max 200)"),
 };
 
 export const metricParameterSchema = z
