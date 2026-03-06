@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, paginationSchema } from "../schemas.js";
 
 interface ErrorName {
@@ -24,8 +24,15 @@ export function registerErrorsTools(
   server.registerTool(
     "rybbit_get_errors",
     {
+      title: "Error Tracking",
       description:
         "Get error tracking data. Use type='names' to see error types and counts, or type='events' to see individual error instances with stack traces and context.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
@@ -64,7 +71,7 @@ export function registerErrorsTools(
             params
           );
           return {
-            content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+            content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
 
@@ -73,7 +80,7 @@ export function registerErrorsTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

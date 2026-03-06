@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, bucketSchema } from "../schemas.js";
 
 interface PerformanceOverview {
@@ -51,8 +51,15 @@ export function registerPerformanceTools(
   server.registerTool(
     "rybbit_get_performance",
     {
+      title: "Web Vitals",
       description:
         "Get Core Web Vitals performance metrics (LCP, CLS, INP, FCP, TTFB) with p50, p75, p90, p99 percentiles. Optionally break down by page path, browser, or OS.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
         dimension: dimensionSchema,
@@ -88,7 +95,7 @@ export function registerPerformanceTools(
             params
           );
           return {
-            content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+            content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
 
@@ -97,7 +104,7 @@ export function registerPerformanceTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -112,8 +119,15 @@ export function registerPerformanceTools(
   server.registerTool(
     "rybbit_get_performance_timeseries",
     {
+      title: "Web Vitals Time Series",
       description:
         "Get Core Web Vitals performance metrics as time-series data for trend analysis.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
         bucket: bucketSchema,
@@ -143,7 +157,7 @@ export function registerPerformanceTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

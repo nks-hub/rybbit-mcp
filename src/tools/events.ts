@@ -1,12 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, paginationSchema } from "../schemas.js";
 
 export function registerEventsTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
     "rybbit_list_events",
     {
+      title: "List Events",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "List raw events for a site with filtering and pagination. Returns individual event records with timestamps, types, pathnames, event names, and properties.",
       inputSchema: {
@@ -19,7 +21,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/events`, params);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -34,6 +36,8 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
   server.registerTool(
     "rybbit_get_event_names",
     {
+      title: "Event Names",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Get all custom event names and their occurrence counts for a site. Useful for discovering what events are being tracked.",
       inputSchema: {
@@ -45,7 +49,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/events/names`, params);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -60,6 +64,8 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
   server.registerTool(
     "rybbit_get_event_properties",
     {
+      title: "Event Properties",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Get property breakdowns for a specific custom event. Returns the distinct property keys and values with counts.",
       inputSchema: {
@@ -73,7 +79,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         params.event_name = args.eventName;
         const data = await client.get(`/sites/${args.siteId}/events/properties`, params);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

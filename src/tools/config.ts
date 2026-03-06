@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, bucketSchema, siteIdSchema } from "../schemas.js";
 
 interface VersionResponse {
@@ -26,8 +26,15 @@ export function registerConfigTools(
   server.registerTool(
     "rybbit_get_config",
     {
+      title: "Get Rybbit Config",
       description: "Get Rybbit server version and configuration",
       inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async () => {
       try {
@@ -46,7 +53,7 @@ export function registerConfigTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(combined, null, 2),
+              text: truncateResponse(combined),
             },
           ],
         };
@@ -63,9 +70,16 @@ export function registerConfigTools(
   server.registerTool(
     "rybbit_list_sites",
     {
+      title: "List Sites",
       description:
         "List all sites and organizations the authenticated user has access to",
       inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async () => {
       try {
@@ -75,7 +89,7 @@ export function registerConfigTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };

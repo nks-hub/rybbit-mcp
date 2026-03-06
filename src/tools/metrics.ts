@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import {
   analyticsInputSchema,
   metricParameterSchema,
@@ -29,8 +29,15 @@ export function registerMetricsTools(
   server.registerTool(
     "rybbit_get_metric",
     {
+      title: "Metric Breakdown",
       description:
         "Get metric breakdown by dimension (browser, OS, country, page, referrer, UTM params, etc.). Returns sorted list with counts, percentages, and optional page-level stats like bounce rate and time on page.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
         parameter: metricParameterSchema,
@@ -64,7 +71,7 @@ export function registerMetricsTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };
@@ -81,8 +88,15 @@ export function registerMetricsTools(
   server.registerTool(
     "rybbit_get_retention",
     {
+      title: "User Retention",
       description:
         "Get user retention cohort analysis showing how many users return over time periods.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
       },
@@ -110,7 +124,7 @@ export function registerMetricsTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };

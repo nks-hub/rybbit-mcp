@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, bucketSchema, siteIdSchema } from "../schemas.js";
 
 interface OverviewMetrics {
@@ -25,10 +25,17 @@ export function registerOverviewTools(
   server.registerTool(
     "rybbit_live_users",
     {
+      title: "Live User Count",
       description:
         "Get the current number of live/active users on a site in real-time",
       inputSchema: {
         siteId: siteIdSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
       },
     },
     async (args) => {
@@ -41,7 +48,7 @@ export function registerOverviewTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ liveUsers: count }, null, 2),
+              text: truncateResponse({ liveUsers: count }),
             },
           ],
         };
@@ -58,10 +65,17 @@ export function registerOverviewTools(
   server.registerTool(
     "rybbit_get_overview",
     {
+      title: "Site Overview",
       description:
         "Get aggregated overview metrics for a site: sessions, pageviews, unique users, pages per session, bounce rate, and average session duration. Supports date range and filters.",
       inputSchema: {
         ...analyticsInputSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
       },
     },
     async (args) => {
@@ -84,7 +98,7 @@ export function registerOverviewTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };
@@ -101,11 +115,18 @@ export function registerOverviewTools(
   server.registerTool(
     "rybbit_get_overview_timeseries",
     {
+      title: "Overview Time Series",
       description:
         "Get overview metrics as time-series data with configurable time buckets (minute, hour, day, week, month). Returns arrays of data points for charting trends.",
       inputSchema: {
         ...analyticsInputSchema,
         bucket: bucketSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
       },
     },
     async (args) => {
@@ -129,7 +150,7 @@ export function registerOverviewTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };

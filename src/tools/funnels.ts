@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { filterSchema, siteIdSchema } from "../schemas.js";
 
 interface FunnelStep {
@@ -34,8 +34,15 @@ export function registerFunnelsTools(
   server.registerTool(
     "rybbit_list_funnels",
     {
+      title: "List Funnels",
       description:
         "List all saved funnels for a site with their step definitions.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         siteId: siteIdSchema,
       },
@@ -48,7 +55,7 @@ export function registerFunnelsTools(
           `/sites/${siteId}/funnels`
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -63,8 +70,15 @@ export function registerFunnelsTools(
   server.registerTool(
     "rybbit_analyze_funnel",
     {
+      title: "Analyze Funnel",
       description:
         "Analyze a custom funnel by defining steps (page visits or events). Returns visitor counts and drop-off rates at each step.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         siteId: siteIdSchema,
         startDate: z
@@ -131,7 +145,7 @@ export function registerFunnelsTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

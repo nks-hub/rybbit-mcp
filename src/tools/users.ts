@@ -1,12 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 export function registerUsersTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
     "rybbit_list_users",
     {
+      title: "List Users",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "List identified users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. Supports filtering by any analytics dimension.",
       inputSchema: {
@@ -19,7 +21,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/users`, params);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -34,6 +36,8 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
   server.registerTool(
     "rybbit_get_user",
     {
+      title: "User Detail",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Get detailed information about a specific user including their traits, session history, and activity summary.",
       inputSchema: {
@@ -45,7 +49,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       try {
         const data = await client.get(`/sites/${args.siteId}/users/${args.userId}`);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -60,6 +64,8 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
   server.registerTool(
     "rybbit_get_user_traits",
     {
+      title: "User Traits",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Get user trait keys and their values. Without a key parameter, returns all available trait keys. With a key, returns the distinct values for that trait.",
       inputSchema: {
@@ -84,7 +90,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           data = await client.get(`/sites/${args.siteId}/user-traits/keys`);
         }
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

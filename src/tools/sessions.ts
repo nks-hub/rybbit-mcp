@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import {
   analyticsInputSchema,
   paginationSchema,
@@ -40,8 +40,15 @@ export function registerSessionsTools(
   server.registerTool(
     "rybbit_list_sessions",
     {
+      title: "List Sessions",
       description:
         "List sessions for a site with filtering and pagination. Returns session ID, user info, device, location, pages visited, duration, and bounce status.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
@@ -72,7 +79,7 @@ export function registerSessionsTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };
@@ -89,8 +96,15 @@ export function registerSessionsTools(
   server.registerTool(
     "rybbit_get_session",
     {
+      title: "Session Detail",
       description:
         "Get detailed session information including all page views, events, user traits, device info, location, and full event timeline.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         siteId: siteIdSchema,
         sessionId: z.string().describe("Session ID to retrieve"),
@@ -111,7 +125,7 @@ export function registerSessionsTools(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(data, null, 2),
+              text: truncateResponse(data),
             },
           ],
         };

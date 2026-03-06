@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { filterSchema, siteIdSchema } from "../schemas.js";
 
 interface Goal {
@@ -20,8 +20,15 @@ export function registerGoalsTools(
   server.registerTool(
     "rybbit_list_goals",
     {
+      title: "List Goals",
       description:
         "List all goals for a site with their current conversion metrics and configuration.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         siteId: siteIdSchema,
         startDate: z
@@ -73,7 +80,7 @@ export function registerGoalsTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

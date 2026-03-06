@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, truncateResponse } from "../client.js";
 import { filterSchema, siteIdSchema } from "../schemas.js";
 
 interface JourneyPath {
@@ -17,8 +17,15 @@ export function registerJourneysTools(
   server.registerTool(
     "rybbit_get_journeys",
     {
+      title: "User Journeys",
       description:
         "Get user journey (flow) analysis showing the most common navigation paths through the site. Shows sequences of pages users visit and how many sessions follow each path.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
       inputSchema: {
         siteId: siteIdSchema,
         startDate: z
@@ -87,7 +94,7 @@ export function registerJourneysTools(
           params
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
