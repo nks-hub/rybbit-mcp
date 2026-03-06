@@ -240,7 +240,7 @@ export function registerFunnelsTools(
           limit?: number;
         };
 
-        const params = client.buildAnalyticsParams(rest);
+        const params = client.buildAnalyticsParams({ ...rest, page: rest.page ?? 1 });
         params.mode = mode;
 
         const data = await client.post(
