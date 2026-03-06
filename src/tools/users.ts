@@ -1,7 +1,110 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { FilterParam, RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
+
+interface SessionRow {
+  identified_user_id: string;
+  user_id: string;
+  session_duration: number;
+  traits?: Record<string, unknown> | null;
+  country?: string;
+  city?: string;
+  browser?: string;
+  device_type?: string;
+  [key: string]: unknown;
+}
+
+interface SessionsApiResponse {
+  data: SessionRow[];
+}
+
+interface AggregatedUser {
+  identified_user_id: string;
+  user_id: string;
+  total_duration: number;
+  sessions: number;
+  traits: Record<string, unknown> | null;
+  country: string;
+  city: string;
+  browser: string;
+  device_type: string;
+}
+
+async function fetchUsersByDuration(
+  client: RybbitClient,
+  siteId: string,
+  args: {
+    startDate?: string;
+    endDate?: string;
+    timeZone?: string;
+    filters?: FilterParam[];
+    pastMinutesStart?: number;
+    pastMinutesEnd?: number;
+    sortOrder?: string;
+    limit?: number;
+  }
+): Promise<{ data: AggregatedUser[] }> {
+  // Fetch sessions in batches to aggregate duration per user
+  const allSessions: SessionRow[] = [];
+  let page = 1;
+  const batchSize = 200;
+  const maxSessions = 2000;
+
+  while (allSessions.length < maxSessions) {
+    const params = client.buildAnalyticsParams({
+      startDate: args.startDate,
+      endDate: args.endDate,
+      timeZone: args.timeZone,
+      filters: args.filters,
+      pastMinutesStart: args.pastMinutesStart,
+      pastMinutesEnd: args.pastMinutesEnd,
+      page,
+      limit: batchSize,
+    });
+    params.identified_only = "true";
+
+    const batch = await client.get<SessionsApiResponse>(`/sites/${siteId}/sessions`, params);
+    const rows = batch?.data ?? (Array.isArray(batch) ? batch : []);
+    if (rows.length === 0) break;
+    allSessions.push(...(rows as SessionRow[]));
+    if (rows.length < batchSize) break;
+    page++;
+  }
+
+  // Aggregate duration per identified user
+  const userMap = new Map<string, AggregatedUser>();
+  for (const s of allSessions) {
+    const uid = s.identified_user_id || s.user_id;
+    if (!uid) continue;
+    const existing = userMap.get(uid);
+    if (existing) {
+      existing.total_duration += s.session_duration ?? 0;
+      existing.sessions++;
+    } else {
+      userMap.set(uid, {
+        identified_user_id: s.identified_user_id ?? "",
+        user_id: s.user_id ?? "",
+        total_duration: s.session_duration ?? 0,
+        sessions: 1,
+        traits: (s.traits as Record<string, unknown>) ?? null,
+        country: (s.country as string) ?? "",
+        city: (s.city as string) ?? "",
+        browser: (s.browser as string) ?? "",
+        device_type: (s.device_type as string) ?? "",
+      });
+    }
+  }
+
+  const sorted = [...userMap.values()].sort((a, b) =>
+    args.sortOrder === "asc"
+      ? a.total_duration - b.total_duration
+      : b.total_duration - a.total_duration
+  );
+
+  const limit = args.limit ?? 20;
+  return { data: sorted.slice(0, limit) };
+}
 
 export function registerUsersTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
@@ -27,9 +130,9 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .optional()
           .describe("Only return identified users (users with identified_user_id). Default: false."),
         sortBy: z
-          .enum(["first_seen", "last_seen", "pageviews", "sessions", "events"])
+          .enum(["first_seen", "last_seen", "pageviews", "sessions", "events", "duration"])
           .optional()
-          .describe("Sort field (default: 'last_seen')"),
+          .describe("Sort field (default: 'last_seen'). 'duration' sorts by total time spent (aggregated from sessions, requires date range)."),
         sortOrder: z
           .enum(["asc", "desc"])
           .optional()
@@ -38,6 +141,21 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     },
     async (args) => {
       try {
+        if (args.sortBy === "duration") {
+          const data = await fetchUsersByDuration(client, args.siteId, {
+            startDate: args.startDate,
+            endDate: args.endDate,
+            timeZone: args.timeZone,
+            filters: args.filters,
+            pastMinutesStart: args.pastMinutesStart,
+            pastMinutesEnd: args.pastMinutesEnd,
+            sortOrder: args.sortOrder,
+            limit: args.limit,
+          });
+          return {
+            content: [{ type: "text" as const, text: truncateResponse(data) }],
+          };
+        }
         const params = client.buildAnalyticsParams(args);
         if (args.search) params.search = args.search;
         if (args.searchField) params.search_field = args.searchField;
