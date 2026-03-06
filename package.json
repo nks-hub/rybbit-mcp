@@ -1,0 +1,45 @@
+{
+  "name": "@nks-hub/rybbit-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Rybbit Analytics - query statistics, errors, users, sessions, funnels, goals, and performance metrics via Claude Code",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "rybbit-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node build/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "rybbit",
+    "analytics",
+    "claude",
+    "model-context-protocol",
+    "web-analytics",
+    "statistics"
+  ],
+  "author": "NKS Hub",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nks-hub/rybbit-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nks-hub/rybbit-mcp/issues"
+  },
+  "homepage": "https://github.com/nks-hub/rybbit-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
