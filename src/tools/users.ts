@@ -10,15 +10,40 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       title: "List Users",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
-        "List identified users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. Supports filtering by any analytics dimension.",
+        "List users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. Supports filtering by any analytics dimension. Use 'search' param to find users by username/email/name (case-insensitive partial match).",
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
+        search: z
+          .string()
+          .optional()
+          .describe("Search users by trait value (e.g. username, email). Uses case-insensitive partial matching (ILIKE)."),
+        searchField: z
+          .enum(["username", "name", "email", "user_id"])
+          .optional()
+          .describe("Which field to search in (default: 'username'). Only used when 'search' is provided."),
+        identifiedOnly: z
+          .boolean()
+          .optional()
+          .describe("Only return identified users (users with identified_user_id). Default: false."),
+        sortBy: z
+          .enum(["first_seen", "last_seen", "pageviews", "sessions", "events"])
+          .optional()
+          .describe("Sort field (default: 'last_seen')"),
+        sortOrder: z
+          .enum(["asc", "desc"])
+          .optional()
+          .describe("Sort direction (default: 'desc')"),
       },
     },
     async (args) => {
       try {
         const params = client.buildAnalyticsParams(args);
+        if (args.search) params.search = args.search;
+        if (args.searchField) params.search_field = args.searchField;
+        if (args.identifiedOnly) params.identified_only = "true";
+        if (args.sortBy) params.sort_by = args.sortBy;
+        if (args.sortOrder) params.sort_order = args.sortOrder;
         const data = await client.get(`/sites/${args.siteId}/users`, params);
         return {
           content: [{ type: "text" as const, text: truncateResponse(data) }],
