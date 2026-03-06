@@ -3,8 +3,8 @@
 [![Build Status](https://github.com/nks-hub/rybbit-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/nks-hub/rybbit-mcp/actions)
 [![npm version](https://img.shields.io/npm/v/@nks-hub/rybbit-mcp.svg)](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.27-8b5cf6)](https://modelcontextprotocol.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178c6.svg)](https://www.typescriptlang.org/)
+[![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.27+-8b5cf6.svg)](https://modelcontextprotocol.io/)
 
 > MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit) — query statistics, errors, users, sessions, funnels, goals, and performance metrics directly from Claude Code or any MCP-compatible client.
 
@@ -60,6 +60,21 @@ Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
 ### Usage
 
 Ask Claude Code anything about your analytics data. The MCP tools are automatically available.
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **27 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys |
+| **Flexible Auth** | API key (recommended) or email/password authentication |
+| **Smart Filtering** | Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types |
+| **Time Ranges** | Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`) |
+| **Time Series** | Configurable bucket granularity from minutes to years |
+| **Pagination** | Built-in page/limit support for large datasets |
+| **Response Truncation** | Auto-truncation at 25k chars to prevent context bloat |
+| **Actionable Errors** | Error messages guide the LLM toward correct tool usage |
 
 ---
 
@@ -201,6 +216,8 @@ npx tsc --noEmit
 
 ## Contributing
 
+Contributions are welcome! For major changes, please open an issue first.
+
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: description'`)
@@ -209,12 +226,22 @@ npx tsc --noEmit
 
 ## Support
 
-- Bug reports: [GitHub Issues](https://github.com/nks-hub/rybbit-mcp/issues)
-- Related: [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) (TypeScript tracking SDK)
+- 📧 **Email:** dev@nks-hub.cz
+- 🐛 **Bug reports:** [GitHub Issues](https://github.com/nks-hub/rybbit-mcp/issues)
+- 📖 **MCP Protocol:** [modelcontextprotocol.io](https://modelcontextprotocol.io/)
 
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## Links
+
+- [Rybbit Analytics](https://github.com/rybbit-io/rybbit)
+- [npm Package](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
+- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) — TypeScript tracking SDK
+- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk) — Flutter/Dart tracking SDK
 
 ---
 
