@@ -20,6 +20,9 @@ Thumbs.db
 # Plans/docs
 docs/plans/
 
+# Tests
+test-*.py
+
 # Logs
 *.log
 npm-debug.log*

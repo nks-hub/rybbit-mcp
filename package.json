@@ -39,6 +39,11 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   },
+  "files": [
+    "build/",
+    "LICENSE",
+    "README.md"
+  ],
   "engines": {
     "node": ">=18.0.0"
   }

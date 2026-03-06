@@ -176,6 +176,9 @@ export function registerFunnelsTools(
           .int()
           .min(1)
           .describe("The funnel step number to get sessions for (1-indexed)"),
+        mode: z
+          .enum(["reached", "dropped"])
+          .describe("'reached' = sessions that made it to this step, 'dropped' = sessions that dropped off at this step"),
         startDate: z
           .string()
           .optional()
@@ -218,9 +221,10 @@ export function registerFunnelsTools(
     },
     async (args) => {
       try {
-        const { siteId, stepNumber, steps, ...rest } = args as {
+        const { siteId, stepNumber, mode, steps, ...rest } = args as {
           siteId: string;
           stepNumber: number;
+          mode: "reached" | "dropped";
           steps: FunnelStep[];
           startDate?: string;
           endDate?: string;
@@ -237,6 +241,7 @@ export function registerFunnelsTools(
         };
 
         const params = client.buildAnalyticsParams(rest);
+        params.mode = mode;
 
         const data = await client.post(
           `/sites/${siteId}/funnels/${stepNumber}/sessions`,

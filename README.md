@@ -1,11 +1,14 @@
 # @nks-hub/rybbit-mcp
 
-[![npm version](https://img.shields.io/npm/v/@nks-hub/rybbit-mcp?color=22c55e)](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
+[![Build Status](https://github.com/nks-hub/rybbit-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/nks-hub/rybbit-mcp/actions)
+[![npm version](https://img.shields.io/npm/v/@nks-hub/rybbit-mcp.svg)](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.27-8b5cf6)](https://modelcontextprotocol.io/)
 
-MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit) — query statistics, errors, users, sessions, funnels, goals, and performance metrics directly from Claude Code or any MCP-compatible client.
+> MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit) — query statistics, errors, users, sessions, funnels, goals, and performance metrics directly from Claude Code or any MCP-compatible client.
+
+---
 
 ## Why?
 
@@ -17,9 +20,11 @@ Instead of manually checking the Rybbit dashboard, let your AI assistant query a
 - "Show user journey from homepage to checkout"
 - "Compare browser usage between mobile and desktop"
 
+---
+
 ## Quick Start
 
-### 1. Install
+### Installation
 
 ```bash
 npm install -g @nks-hub/rybbit-mcp
@@ -33,7 +38,7 @@ cd rybbit-mcp
 npm install && npm run build
 ```
 
-### 2. Configure Claude Code
+### Configuration
 
 Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
 
@@ -41,8 +46,8 @@ Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
 {
   "mcpServers": {
     "rybbit": {
-      "command": "node",
-      "args": ["C:/path/to/rybbit-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "@nks-hub/rybbit-mcp"],
       "env": {
         "RYBBIT_URL": "https://your-rybbit-instance.com",
         "RYBBIT_API_KEY": "your-api-key"
@@ -52,9 +57,11 @@ Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
 }
 ```
 
-### 3. Use
+### Usage
 
 Ask Claude Code anything about your analytics data. The MCP tools are automatically available.
+
+---
 
 ## Authentication
 
@@ -66,6 +73,8 @@ Supports two authentication methods:
 | **Email/Password** | `RYBBIT_EMAIL`, `RYBBIT_PASSWORD` | Development/testing |
 
 Both require `RYBBIT_URL` pointing to your Rybbit instance.
+
+---
 
 ## Tools (27)
 
@@ -136,6 +145,8 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_get_journeys` | User navigation path analysis |
 
+---
+
 ## Common Parameters
 
 All analytics tools support these optional parameters:
@@ -161,18 +172,52 @@ All analytics tools support these optional parameters:
 
 `minute`, `five_minutes`, `ten_minutes`, `fifteen_minutes`, `hour`, `day`, `week`, `month`, `year`
 
+---
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Watch mode
+npm run dev
+
+# Type checking
+npx tsc --noEmit
+```
+
+---
+
 ## Requirements
 
-- Node.js >= 18
-- Rybbit Analytics instance (self-hosted or cloud)
+- **Node.js**: 18+
+- **Rybbit Analytics**: Self-hosted or cloud instance
 
-## Related
+---
 
-- [rybbit-io/rybbit](https://github.com/rybbit-io/rybbit) — Rybbit Analytics platform
-- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) — TypeScript tracking SDK
-- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk) — Flutter/Dart tracking SDK
-- [rybbit-app](https://github.com/nks-hub/rybbit-app) — Flutter mobile client
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: description'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Support
+
+- Bug reports: [GitHub Issues](https://github.com/nks-hub/rybbit-mcp/issues)
+- Related: [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) (TypeScript tracking SDK)
 
 ## License
 
-[MIT](LICENSE)
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/nks-hub">NKS Hub</a>
+</p>

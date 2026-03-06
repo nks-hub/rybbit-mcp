@@ -45,7 +45,7 @@ export function registerErrorsTools(
         errorMessage: z
           .string()
           .optional()
-          .describe("Error message to get timeseries for (required when type='timeseries'). Use type='names' first to discover error messages."),
+          .describe("Error message filter (required for type='events' and type='timeseries'). Use type='names' first to discover error messages."),
         bucket: z
           .enum(["minute", "five_minutes", "hour", "day", "week", "month"])
           .optional()
@@ -93,6 +93,13 @@ export function registerErrorsTools(
         }
 
         if (type === "events") {
+          if (!errorMessage) {
+            return {
+              content: [{ type: "text" as const, text: "Error: errorMessage is required for type='events'. Use type='names' first to discover error messages, then pass one to errorMessage." }],
+              isError: true,
+            };
+          }
+          params.errorMessage = errorMessage;
           const data = await client.get<ErrorEvent[]>(
             `/sites/${siteId}/error-events`,
             params
