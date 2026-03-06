@@ -92,7 +92,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       title: "User Traits",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
-        "Get user trait keys, values, or find users by trait. mode='keys' lists all trait keys. mode='values' (default when key is provided) returns distinct values for a trait key. mode='users' finds users matching a specific trait key+value pair.",
+        "Get user trait keys, values, or find users by trait. mode='keys' lists all trait keys. mode='values' (default when key is provided) returns distinct values for a trait key. mode='users' finds users matching a specific trait key+value pair (case-insensitive).",
       inputSchema: {
         siteId: siteIdSchema,
         mode: z
@@ -118,9 +118,21 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const resolvedMode = args.mode ?? (args.key ? "values" : "keys");
 
         if (resolvedMode === "users") {
+          // API does exact (case-sensitive) match, so resolve the correct case first
+          let resolvedValue = args.value;
+          if (args.key && args.value) {
+            const valuesData = await client.get<{ values: { value: string }[] }>(
+              `/sites/${args.siteId}/user-traits/values`,
+              { key: args.key, limit: 1000 }
+            );
+            const match = valuesData.values?.find(
+              (v) => v.value.toLowerCase() === args.value!.toLowerCase()
+            );
+            if (match) resolvedValue = match.value;
+          }
           const params: Record<string, string | number> = {};
           if (args.key !== undefined) params.key = args.key;
-          if (args.value !== undefined) params.value = args.value;
+          if (resolvedValue !== undefined) params.value = resolvedValue;
           if (args.limit !== undefined) params.limit = args.limit;
           data = await client.get(`/sites/${args.siteId}/user-traits/users`, params);
         } else if (resolvedMode === "values" && args.key !== undefined) {
