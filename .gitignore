@@ -6,14 +6,19 @@ build/
 .env
 .env.local
 
-# IDE
+# Editor/IDE local configs
 .[a-z]*/
 !.git/
 !.github/
+/[A-Z]*.md
+!/README.md
 
 # OS
 Thumbs.db
 .DS_Store
+
+# Plans/docs
+docs/plans/
 
 # Logs
 *.log
