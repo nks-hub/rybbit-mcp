@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { RybbitClient, truncateResponse } from "../client.js";
-import { analyticsInputSchema, paginationSchema } from "../schemas.js";
+import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
 export function registerEventsTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
@@ -78,6 +78,64 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         params.event_name = args.eventName;
         const data = await client.get(`/sites/${args.siteId}/events/properties`, params);
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_get_event_timeseries",
+    {
+      title: "Event Time Series",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      description:
+        "Get custom event counts as time-series data with configurable buckets. Useful for analyzing event trends over time.",
+      inputSchema: {
+        ...analyticsInputSchema,
+        bucket: bucketSchema,
+      },
+    },
+    async (args) => {
+      try {
+        const params = client.buildAnalyticsParams(args);
+        const data = await client.get(`/sites/${args.siteId}/events/bucketed`, params);
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_get_outbound_links",
+    {
+      title: "Outbound Links",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      description:
+        "Get outbound link clicks tracked on the site. Shows which external URLs users are clicking and how often.",
+      inputSchema: {
+        ...analyticsInputSchema,
+        ...paginationSchema,
+      },
+    },
+    async (args) => {
+      try {
+        const params = client.buildAnalyticsParams(args);
+        const data = await client.get(`/sites/${args.siteId}/events/outbound`, params);
         return {
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };

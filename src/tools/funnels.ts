@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { RybbitClient, truncateResponse } from "../client.js";
-import { filterSchema, siteIdSchema } from "../schemas.js";
+import { analyticsInputSchema, filterSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface FunnelStep {
   value: string;
@@ -141,6 +141,105 @@ export function registerFunnelsTools(
 
         const data = await client.post<FunnelAnalysisResult>(
           `/sites/${siteId}/funnels/analyze`,
+          { steps },
+          params
+        );
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_get_funnel_step_sessions",
+    {
+      title: "Funnel Step Sessions",
+      description:
+        "Get the sessions that reached (or dropped off at) a specific funnel step. Useful for drilling into why users drop off at a particular funnel step.",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
+      inputSchema: {
+        siteId: siteIdSchema,
+        stepNumber: z
+          .number()
+          .int()
+          .min(1)
+          .describe("The funnel step number to get sessions for (1-indexed)"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Start date (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("End date (YYYY-MM-DD)"),
+        timeZone: z
+          .string()
+          .optional()
+          .describe("IANA timezone (default UTC)"),
+        filters: z
+          .array(filterSchema)
+          .optional()
+          .describe("Filters to apply"),
+        pastMinutesStart: z
+          .number()
+          .optional()
+          .describe("Minutes ago start"),
+        pastMinutesEnd: z
+          .number()
+          .optional()
+          .describe("Minutes ago end"),
+        steps: z
+          .array(
+            z.object({
+              value: z.string().describe("Page path or event name"),
+              type: z.enum(["page", "event"]).describe("Step type"),
+              name: z
+                .string()
+                .optional()
+                .describe("Display name for the step"),
+            })
+          )
+          .min(2)
+          .describe("The funnel steps definition (same as used in rybbit_analyze_funnel)"),
+        ...paginationSchema,
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, stepNumber, steps, ...rest } = args as {
+          siteId: string;
+          stepNumber: number;
+          steps: FunnelStep[];
+          startDate?: string;
+          endDate?: string;
+          timeZone?: string;
+          filters?: Array<{
+            parameter: string;
+            type: string;
+            value: (string | number)[];
+          }>;
+          pastMinutesStart?: number;
+          pastMinutesEnd?: number;
+          page?: number;
+          limit?: number;
+        };
+
+        const params = client.buildAnalyticsParams(rest);
+
+        const data = await client.post(
+          `/sites/${siteId}/funnels/${stepNumber}/sessions`,
           { steps },
           params
         );

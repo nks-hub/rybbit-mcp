@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { RybbitClient, truncateResponse } from "../client.js";
-import { analyticsInputSchema, bucketSchema, siteIdSchema } from "../schemas.js";
+import { analyticsInputSchema, bucketSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface OverviewMetrics {
   sessions?: number;
@@ -143,6 +143,50 @@ export function registerOverviewTools(
 
         const data = await client.get<TimeseriesDataPoint[]>(
           `/sites/${args.siteId}/overview-bucketed`,
+          params
+        );
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: truncateResponse(data),
+            },
+          ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_get_session_locations",
+    {
+      title: "Session Locations",
+      description:
+        "Get geographic session location data with coordinates. Returns latitude, longitude, city, country, and session count for map visualization and geographic analysis.",
+      inputSchema: {
+        ...analyticsInputSchema,
+        ...paginationSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (args) => {
+      try {
+        const params = client.buildAnalyticsParams(args);
+
+        const data = await client.get(
+          `/sites/${args.siteId}/session-locations`,
           params
         );
 

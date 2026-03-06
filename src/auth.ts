@@ -61,6 +61,7 @@ async function loginWithCredentials(config: AuthConfig): Promise<void> {
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      Origin: config.baseUrl,
     },
     body: JSON.stringify({ email: config.email, password: config.password }),
     redirect: "manual",

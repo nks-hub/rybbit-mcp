@@ -67,7 +67,7 @@ Supports two authentication methods:
 
 Both require `RYBBIT_URL` pointing to your Rybbit instance.
 
-## Tools (22)
+## Tools (27)
 
 ### Configuration
 | Tool | Description |
@@ -81,6 +81,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_live_users` | Current active users count |
 | `rybbit_get_overview` | Aggregated metrics (sessions, pageviews, users, bounce rate, duration) |
 | `rybbit_get_overview_timeseries` | Metrics as time-series with configurable buckets |
+| `rybbit_get_session_locations` | Geographic session data with coordinates for map visualization |
 
 ### Metrics & Dimensions
 | Tool | Description |
@@ -99,7 +100,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_list_users` | Identified users with session counts and traits |
 | `rybbit_get_user` | User detail with traits and activity |
-| `rybbit_get_user_traits` | Available trait keys and values |
+| `rybbit_get_user_traits` | Trait keys, values, or find users by trait |
 
 ### Events
 | Tool | Description |
@@ -107,11 +108,13 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_list_events` | Raw event records with filtering |
 | `rybbit_get_event_names` | Custom event names and counts |
 | `rybbit_get_event_properties` | Property breakdowns per event |
+| `rybbit_get_event_timeseries` | Event count trends over time with configurable buckets |
+| `rybbit_get_outbound_links` | Outbound link clicks with URLs and counts |
 
 ### Errors
 | Tool | Description |
 |------|-------------|
-| `rybbit_get_errors` | Error types/counts or individual error instances |
+| `rybbit_get_errors` | Error types/counts, individual instances, or timeseries for a specific error |
 
 ### Performance (Web Vitals)
 | Tool | Description |
@@ -124,7 +127,9 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_list_funnels` | Saved funnels with step definitions |
 | `rybbit_analyze_funnel` | Ad-hoc funnel analysis with custom steps |
+| `rybbit_get_funnel_step_sessions` | Sessions that reached or dropped off at a funnel step |
 | `rybbit_list_goals` | Goals with conversion metrics |
+| `rybbit_get_goal_sessions` | Sessions that completed a specific goal |
 
 ### Journeys
 | Tool | Description |

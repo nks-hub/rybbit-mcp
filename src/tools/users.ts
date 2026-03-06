@@ -67,22 +67,38 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       title: "User Traits",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
-        "Get user trait keys and their values. Without a key parameter, returns all available trait keys. With a key, returns the distinct values for that trait.",
+        "Get user trait keys, values, or find users by trait. mode='keys' lists all trait keys. mode='values' (default when key is provided) returns distinct values for a trait key. mode='users' finds users matching a specific trait key+value pair.",
       inputSchema: {
         siteId: siteIdSchema,
+        mode: z
+          .enum(["keys", "values", "users"])
+          .optional()
+          .describe("'keys' to list trait keys, 'values' to get values for a key, 'users' to find users by trait. Default: 'keys' if no key provided, 'values' if key is provided."),
         key: z
           .string()
           .optional()
           .describe(
-            "Specific trait key to get values for. Omit to list all available trait keys."
+            "Trait key (required for 'values' and 'users' modes)"
           ),
-        limit: z.number().optional().describe("Max values to return per key"),
+        value: z
+          .string()
+          .optional()
+          .describe("Trait value (required for 'users' mode)"),
+        limit: z.number().optional().describe("Max results to return"),
       },
     },
     async (args) => {
       try {
         let data: unknown;
-        if (args.key !== undefined) {
+        const resolvedMode = args.mode ?? (args.key ? "values" : "keys");
+
+        if (resolvedMode === "users") {
+          const params: Record<string, string | number> = {};
+          if (args.key !== undefined) params.key = args.key;
+          if (args.value !== undefined) params.value = args.value;
+          if (args.limit !== undefined) params.limit = args.limit;
+          data = await client.get(`/sites/${args.siteId}/user-traits/users`, params);
+        } else if (resolvedMode === "values" && args.key !== undefined) {
           const params: Record<string, string | number> = { key: args.key };
           if (args.limit !== undefined) params.limit = args.limit;
           data = await client.get(`/sites/${args.siteId}/user-traits/values`, params);

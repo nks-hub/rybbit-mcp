@@ -37,18 +37,28 @@ export function registerErrorsTools(
         ...analyticsInputSchema,
         ...paginationSchema,
         type: z
-          .enum(["names", "events"])
+          .enum(["names", "events", "timeseries"])
           .optional()
           .describe(
-            "'names' for error type summary, 'events' for individual error instances. Default: names"
+            "'names' for error type summary with counts, 'events' for individual error instances with stack traces, 'timeseries' for error count trends over time for a specific error. Default: names"
           ),
+        errorMessage: z
+          .string()
+          .optional()
+          .describe("Error message to get timeseries for (required when type='timeseries'). Use type='names' first to discover error messages."),
+        bucket: z
+          .enum(["minute", "five_minutes", "hour", "day", "week", "month"])
+          .optional()
+          .describe("Time bucket for timeseries type (default: day)"),
       },
     },
     async (args) => {
       try {
-        const { siteId, type, page, limit, ...rest } = args as {
+        const { siteId, type, errorMessage, bucket, page, limit, ...rest } = args as {
           siteId: string;
-          type?: "names" | "events";
+          type?: "names" | "events" | "timeseries";
+          errorMessage?: string;
+          bucket?: string;
           page?: number;
           limit?: number;
           startDate?: string;
@@ -63,7 +73,24 @@ export function registerErrorsTools(
           pastMinutesEnd?: number;
         };
 
-        const params = client.buildAnalyticsParams({ ...rest, page, limit });
+        const params = client.buildAnalyticsParams({ ...rest, page, limit, bucket });
+
+        if (type === "timeseries") {
+          if (!errorMessage) {
+            return {
+              content: [{ type: "text" as const, text: "Error: errorMessage is required for type='timeseries'. Use type='names' first to discover error messages, then pass one to errorMessage." }],
+              isError: true,
+            };
+          }
+          params.errorMessage = errorMessage;
+          const data = await client.get<unknown[]>(
+            `/sites/${siteId}/error-bucketed`,
+            params
+          );
+          return {
+            content: [{ type: "text" as const, text: truncateResponse(data) }],
+          };
+        }
 
         if (type === "events") {
           const data = await client.get<ErrorEvent[]>(

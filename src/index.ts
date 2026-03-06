@@ -20,10 +20,20 @@ async function main() {
   const config = getAuthConfig();
   const client = new RybbitClient(config);
 
-  const server = new McpServer({
-    name: "rybbit-mcp",
-    version: "0.1.0",
-  });
+  const server = new McpServer(
+    {
+      name: "rybbit-mcp",
+      version: "0.2.0",
+    },
+    {
+      instructions:
+        "Rybbit Analytics MCP server. Start with rybbit_list_sites to discover available sites and their IDs. " +
+        "Most tools accept date ranges (startDate/endDate in YYYY-MM-DD) or relative time (pastMinutesStart/pastMinutesEnd). " +
+        "Use filters array to narrow results by dimension (browser, country, pathname, etc.). " +
+        "For large datasets, use page/limit pagination. " +
+        "Workflow: list_sites → get_overview → drill into metrics/sessions/users/events/errors as needed.",
+    }
+  );
 
   registerConfigTools(server, client);
   registerOverviewTools(server, client);
