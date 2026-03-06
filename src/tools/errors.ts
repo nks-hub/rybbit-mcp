@@ -1,0 +1,87 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { RybbitClient } from "../client.js";
+import { analyticsInputSchema, paginationSchema } from "../schemas.js";
+
+interface ErrorName {
+  name: string;
+  count: number;
+  [key: string]: unknown;
+}
+
+interface ErrorEvent {
+  id: string;
+  name: string;
+  message?: string;
+  stack?: string;
+  [key: string]: unknown;
+}
+
+export function registerErrorsTools(
+  server: McpServer,
+  client: RybbitClient
+): void {
+  server.registerTool(
+    "rybbit_get_errors",
+    {
+      description:
+        "Get error tracking data. Use type='names' to see error types and counts, or type='events' to see individual error instances with stack traces and context.",
+      inputSchema: {
+        ...analyticsInputSchema,
+        ...paginationSchema,
+        type: z
+          .enum(["names", "events"])
+          .optional()
+          .describe(
+            "'names' for error type summary, 'events' for individual error instances. Default: names"
+          ),
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, type, page, limit, ...rest } = args as {
+          siteId: string;
+          type?: "names" | "events";
+          page?: number;
+          limit?: number;
+          startDate?: string;
+          endDate?: string;
+          timeZone?: string;
+          filters?: Array<{
+            parameter: string;
+            type: string;
+            value: (string | number)[];
+          }>;
+          pastMinutesStart?: number;
+          pastMinutesEnd?: number;
+        };
+
+        const params = client.buildAnalyticsParams({ ...rest, page, limit });
+
+        if (type === "events") {
+          const data = await client.get<ErrorEvent[]>(
+            `/sites/${siteId}/error-events`,
+            params
+          );
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+          };
+        }
+
+        const data = await client.get<ErrorName[]>(
+          `/sites/${siteId}/error-names`,
+          params
+        );
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+}
