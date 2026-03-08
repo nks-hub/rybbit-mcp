@@ -42,7 +42,7 @@ export function registerSessionsTools(
     {
       title: "List Sessions",
       description:
-        "List sessions for a site with filtering and pagination. Returns session ID, user info, device, location, pages visited, duration, and bounce status.",
+        "List sessions for a site with filtering and pagination. Returns session ID, user info, device, location, pages visited, duration, bounce status, and IP address (if site has trackIp enabled). Supports client-side IP filtering.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -52,14 +52,29 @@ export function registerSessionsTools(
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
+        ip: z
+          .string()
+          .optional()
+          .describe("Filter sessions by IP address (exact or partial match, client-side). Requires site to have trackIp enabled."),
+        identifiedOnly: z
+          .boolean()
+          .optional()
+          .describe("Only return sessions from identified users. Default: false."),
+        minDuration: z
+          .number()
+          .optional()
+          .describe("Minimum session duration in seconds."),
       },
     },
     async (args) => {
       try {
-        const { siteId, page, limit, ...rest } = args as {
+        const { siteId, page, limit, ip, identifiedOnly, minDuration, ...rest } = args as {
           siteId: string;
           page?: number;
           limit?: number;
+          ip?: string;
+          identifiedOnly?: boolean;
+          minDuration?: number;
           startDate?: string;
           endDate?: string;
           timeZone?: string;
@@ -69,6 +84,45 @@ export function registerSessionsTools(
         };
 
         const params = client.buildAnalyticsParams({ ...rest, page, limit });
+        if (identifiedOnly) params.identified_only = "true";
+        if (minDuration !== undefined) params.min_duration = String(minDuration);
+
+        if (ip) {
+          // IP filtering: fetch multiple pages and filter client-side
+          const allSessions: Record<string, unknown>[] = [];
+          let fetchPage = 1;
+          const batchSize = 200;
+          const maxSessions = 2000;
+          const ipLower = ip.toLowerCase();
+
+          while (allSessions.length < maxSessions) {
+            const batchParams = { ...params, page: String(fetchPage), limit: String(batchSize) };
+            const batch = await client.get<{ data: Record<string, unknown>[] }>(
+              `/sites/${siteId}/sessions`,
+              batchParams
+            );
+            const rows = batch?.data ?? (Array.isArray(batch) ? batch : []);
+            if (rows.length === 0) break;
+
+            for (const s of rows) {
+              const sessionIp = String(s.ip || "");
+              if (sessionIp && sessionIp.toLowerCase().includes(ipLower)) {
+                allSessions.push(s);
+              }
+            }
+            if (rows.length < batchSize) break;
+            fetchPage++;
+          }
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: truncateResponse({ data: allSessions, filteredBy: `ip=${ip}`, scannedPages: fetchPage }),
+              },
+            ],
+          };
+        }
 
         const data = await client.get<SessionSummary[]>(
           `/sites/${siteId}/sessions`,
