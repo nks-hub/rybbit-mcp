@@ -28,6 +28,11 @@ export class RybbitClient {
     return this.request<T>("POST", url, body);
   }
 
+  async put<T>(path: string, body?: unknown, params?: QueryParams): Promise<T> {
+    const url = this.buildUrl(path, params);
+    return this.request<T>("PUT", url, body);
+  }
+
   private buildUrl(path: string, params?: QueryParams): string {
     const base = `${this.config.baseUrl}/api${path}`;
     if (!params) return base;
