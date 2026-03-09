@@ -317,4 +317,47 @@ export function registerConfigTools(
       }
     }
   );
+
+  server.registerTool(
+    "rybbit_delete_site",
+    {
+      title: "Delete Site",
+      description:
+        "Delete a site from Rybbit. This permanently removes the site and its replay data. Use rybbit_list_sites or rybbit_get_site_id to find site IDs.",
+      inputSchema: {
+        siteId: siteIdSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ siteId }) => {
+      try {
+        const data = await client.delete<{ success: boolean }>(
+          `/sites/${siteId}`
+        );
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: truncateResponse({
+                message: `Site '${siteId}' deleted successfully`,
+                ...data,
+              }),
+            },
+          ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
 }

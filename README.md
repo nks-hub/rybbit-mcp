@@ -67,7 +67,7 @@ Ask Claude Code anything about your analytics data. The MCP tools are automatica
 
 | Feature | Description |
 |---------|-------------|
-| **30 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management |
+| **31 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management |
 | **Flexible Auth** | API key (recommended) or email/password authentication |
 | **Smart Filtering** | Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types |
 | **Time Ranges** | Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`) |
@@ -91,7 +91,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 
 ---
 
-## Tools (30)
+## Tools (31)
 
 ### Configuration & Site Management
 | Tool | Description |
@@ -99,6 +99,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_get_config` | Get server version and configuration |
 | `rybbit_list_sites` | List all sites and organizations |
 | `rybbit_create_site` | Create a new site in an organization |
+| `rybbit_delete_site` | Delete a site permanently |
 | `rybbit_get_site_id` | Look up site ID by domain name |
 | `rybbit_update_site_config` | Update site tracking config (IP, errors, replay, etc.) |
 

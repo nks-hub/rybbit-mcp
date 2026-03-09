@@ -33,6 +33,11 @@ export class RybbitClient {
     return this.request<T>("PUT", url, body);
   }
 
+  async delete<T>(path: string, params?: QueryParams): Promise<T> {
+    const url = this.buildUrl(path, params);
+    return this.request<T>("DELETE", url);
+  }
+
   private buildUrl(path: string, params?: QueryParams): string {
     const base = `${this.config.baseUrl}/api${path}`;
     if (!params) return base;
