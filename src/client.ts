@@ -61,6 +61,11 @@ export class RybbitClient {
   ): Promise<T> {
     const headers = await getAuthHeaders(this.config);
 
+    // Remove Content-Type for requests without body (DELETE, GET)
+    if (!body) {
+      delete headers["Content-Type"];
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
