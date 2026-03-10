@@ -12,7 +12,7 @@ export const filterSchema = z.object({
   parameter: z
     .string()
     .describe(
-      "Filter dimension: browser, operating_system, language, country, region, city, device_type, referrer, hostname, pathname, page_title, querystring, event_name, channel, utm_source, utm_medium, utm_campaign, utm_term, utm_content, entry_page, exit_page, user_id"
+      "Filter dimension: browser, operating_system, language, country, region, city, device_type, referrer, hostname, pathname, page_title, querystring, event_name, channel, utm_source, utm_medium, utm_campaign, utm_term, utm_content, entry_page, exit_page, user_id. Note: user_id filter checks BOTH the device hash (user_id) and app-provided ID (identified_user_id)."
     ),
   type: z
     .enum([

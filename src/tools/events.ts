@@ -3,6 +3,17 @@ import { z } from "zod";
 import { RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
+interface EventRow {
+  event_name?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+interface EventsApiResponse {
+  data: EventRow[];
+  cursor?: { hasMore: boolean; oldestTimestamp: string | null };
+}
+
 export function registerEventsTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
     "rybbit_list_events",
@@ -10,16 +21,29 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "List Events",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
       description:
-        "List raw events for a site with filtering and pagination. Returns individual event records with timestamps, types, pathnames, event names, and properties.",
+        "List raw events for a site with filtering and pagination. Returns individual event records with timestamps, types, pathnames, event names, and properties. When filtering by event_name, only matching events are returned (not entire sessions).",
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
+        eventName: z
+          .string()
+          .optional()
+          .describe("Filter to only return events with this exact event_name (e.g., 'ad_click'). More precise than using the filters array which returns entire sessions."),
       },
     },
     async (args) => {
       try {
         const params = client.buildAnalyticsParams(args);
-        const data = await client.get(`/sites/${args.siteId}/events`, params);
+        const data = await client.get<EventsApiResponse>(`/sites/${args.siteId}/events`, params);
+
+        // Post-filter: if eventName specified, filter to only matching events
+        // This works around the backend's session-level event_name filtering
+        if (args.eventName && data?.data) {
+          data.data = data.data.filter(
+            (e) => e.event_name === args.eventName
+          );
+        }
+
         return {
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };

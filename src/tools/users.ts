@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FilterParam, RybbitClient, truncateResponse } from "../client.js";
+import { FilterParam, QueryParams, RybbitClient, truncateResponse } from "../client.js";
 import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface SessionRow {
@@ -156,15 +156,30 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
             content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
-        const params = client.buildAnalyticsParams(args);
+
+        // Workaround: event_name filter crashes the backend getUsers endpoint
+        // (applies session-level subquery to CTE outer query where session_id doesn't exist).
+        // Strip it from filters and add a warning.
+        const safeFilters = args.filters?.filter(
+          (f) => f.parameter !== "event_name"
+        );
+        const hadEventFilter = safeFilters?.length !== args.filters?.length;
+        const safeArgs = { ...args, filters: safeFilters };
+
+        const params = client.buildAnalyticsParams(safeArgs);
         if (args.search) params.search = args.search;
         if (args.searchField) params.search_field = args.searchField;
         if (args.identifiedOnly) params.identified_only = "true";
         if (args.sortBy) params.sort_by = args.sortBy;
         if (args.sortOrder) params.sort_order = args.sortOrder;
         const data = await client.get(`/sites/${args.siteId}/users`, params);
+
+        const warning = hadEventFilter
+          ? "\n\nNote: event_name filter was removed (not supported for user listing due to backend limitation). Use rybbit_get_user_event_breakdown to find users by specific events."
+          : "";
+
         return {
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
+          content: [{ type: "text" as const, text: truncateResponse(data) + warning }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -260,6 +275,52 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         } else {
           data = await client.get(`/sites/${args.siteId}/user-traits/keys`);
         }
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get per-user event breakdown
+  // Workaround for missing backend aggregation — fetches events via the events
+  // endpoint filtered by user_id and aggregates event counts client-side.
+  server.registerTool(
+    "rybbit_get_user_event_breakdown",
+    {
+      title: "User Event Breakdown",
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      description:
+        "Get event count breakdown for a specific user. Shows how many times each event_name was triggered by this user. " +
+        "Accepts either the Rybbit user_id (device hash) or the identified_user_id (app-provided user ID). " +
+        "Useful for analyzing per-user behavior like ad_click, chat_message_sent, etc.",
+      inputSchema: {
+        ...analyticsInputSchema,
+        userId: z.string().describe("User ID — either Rybbit device hash (user_id) or app-provided ID (identified_user_id). Both are checked."),
+      },
+    },
+    async (args) => {
+      try {
+        // Build filters with user_id (backend checks both user_id and identified_user_id)
+        const userFilter: FilterParam = {
+          parameter: "user_id",
+          type: "equals",
+          value: [args.userId],
+        };
+        const filters = [...(args.filters ?? []), userFilter];
+        const safeArgs = { ...args, filters };
+
+        // Fetch event names endpoint — it already returns counts per event_name,
+        // and the user_id filter will scope it to this user.
+        const params = client.buildAnalyticsParams(safeArgs);
+        const data = await client.get(`/sites/${args.siteId}/events/names`, params);
+
         return {
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
