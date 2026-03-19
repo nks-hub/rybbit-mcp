@@ -5,7 +5,8 @@
 import { z } from "zod";
 
 export const siteIdSchema = z
-  .string()
+  .union([z.string(), z.number()])
+  .transform((v) => String(v))
   .describe("Site ID (numeric ID or domain identifier)");
 
 export const filterSchema = z.object({
