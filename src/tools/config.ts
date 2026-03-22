@@ -144,21 +144,33 @@ export function registerConfigTools(
     },
     async ({ domain, name, organizationId, type }) => {
       try {
+        const isApp = type === "app";
         const data = await client.post<Site>(
           `/organizations/${organizationId}/sites`,
           {
             domain,
             name: name || domain,
             ...(type ? { type } : {}),
+            // App sites must have blockBots disabled - Dart/Flutter HTTP UA is detected as bot
+            ...(isApp ? { blockBots: false } : {}),
           }
         );
+
+        // For app sites, ensure blockBots is disabled via config update
+        if (isApp && data.id) {
+          try {
+            await client.put(`/sites/${data.id}/config`, { blockBots: false });
+          } catch {
+            // Best-effort, create already set it
+          }
+        }
 
         return {
           content: [
             {
               type: "text" as const,
               text: truncateResponse({
-                message: `Site '${data.domain}' created successfully`,
+                message: `Site '${data.domain}' created successfully${isApp ? " (blockBots disabled for app site)" : ""}`,
                 siteId: data.id,
                 domain: data.domain,
                 name: data.name,
