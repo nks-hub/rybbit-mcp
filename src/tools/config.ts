@@ -116,11 +116,11 @@ export function registerConfigTools(
     {
       title: "Create Site",
       description:
-        "Create a new site in Rybbit. Returns the created site with its siteId for tracking integration.",
+        "Create a new site in Rybbit. Use type 'web' for websites (domain like 'example.com') or type 'app' for mobile apps (package name like 'com.example.app'). Returns the created site with its siteId for tracking integration.",
       inputSchema: {
         domain: z
           .string()
-          .describe("Domain of the site (e.g. 'example.com')"),
+          .describe("Domain of the site (e.g. 'example.com') or package name for apps (e.g. 'com.example.app')"),
         name: z
           .string()
           .optional()
@@ -130,6 +130,10 @@ export function registerConfigTools(
           .describe(
             "Organization ID to add the site to. Use rybbit_list_sites to find organization IDs."
           ),
+        type: z
+          .enum(["web", "app"])
+          .optional()
+          .describe("Site type: 'web' for websites (default), 'app' for mobile apps"),
       },
       annotations: {
         readOnlyHint: false,
@@ -138,13 +142,14 @@ export function registerConfigTools(
         openWorldHint: true,
       },
     },
-    async ({ domain, name, organizationId }) => {
+    async ({ domain, name, organizationId, type }) => {
       try {
         const data = await client.post<Site>(
           `/organizations/${organizationId}/sites`,
           {
             domain,
             name: name || domain,
+            ...(type ? { type } : {}),
           }
         );
 
