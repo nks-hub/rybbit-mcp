@@ -182,7 +182,7 @@ export function registerConfigTools(
     {
       title: "Get Site ID by Domain",
       description:
-        "Look up a site ID by domain name. Useful for finding the siteId needed for tracking setup and analytics queries.",
+        "Look up a site by domain name. Returns the numeric siteId used for analytics API queries. Note: for SDK tracking setup, use the hash siteId returned by rybbit_create_site instead.",
       inputSchema: {
         domain: z
           .string()

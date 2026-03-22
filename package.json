@@ -1,6 +1,6 @@
 {
   "name": "@nks-hub/rybbit-mcp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "MCP server for Rybbit Analytics - query statistics, errors, users, sessions, funnels, goals, and performance metrics via Claude Code",
   "type": "module",
   "main": "build/index.js",
