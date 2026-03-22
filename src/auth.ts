@@ -10,8 +10,6 @@ export interface AuthConfig {
   password?: string;
 }
 
-let sessionCookie: string | null = null;
-
 export function getAuthConfig(): AuthConfig {
   const baseUrl = process.env.RYBBIT_URL?.replace(/\/+$/, "");
   if (!baseUrl) {
@@ -29,8 +27,9 @@ export function getAuthConfig(): AuthConfig {
 }
 
 export async function getAuthHeaders(
-  config: AuthConfig
-): Promise<Record<string, string>> {
+  config: AuthConfig,
+  sessionCookie: string | null
+): Promise<{ headers: Record<string, string>; sessionCookie: string | null }> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -38,23 +37,24 @@ export async function getAuthHeaders(
 
   if (config.apiKey) {
     headers["Authorization"] = `Bearer ${config.apiKey}`;
-    return headers;
+    return { headers, sessionCookie };
   }
 
   if (config.email && config.password) {
-    if (!sessionCookie) {
-      await loginWithCredentials(config);
+    let cookie = sessionCookie;
+    if (!cookie) {
+      cookie = await loginWithCredentials(config);
     }
-    if (sessionCookie) {
-      headers["Cookie"] = sessionCookie;
+    if (cookie) {
+      headers["Cookie"] = cookie;
     }
-    return headers;
+    return { headers, sessionCookie: cookie };
   }
 
-  return headers;
+  return { headers, sessionCookie };
 }
 
-async function loginWithCredentials(config: AuthConfig): Promise<void> {
+async function loginWithCredentials(config: AuthConfig): Promise<string | null> {
   const url = `${config.baseUrl}/api/auth/sign-in/email`;
   const res = await fetch(url, {
     method: "POST",
@@ -78,15 +78,9 @@ async function loginWithCredentials(config: AuthConfig): Promise<void> {
   );
 
   if (sessionToken) {
-    sessionCookie = sessionToken.split(";")[0];
-  } else {
-    const allCookies = setCookie.map((c) => c.split(";")[0]).join("; ");
-    if (allCookies) {
-      sessionCookie = allCookies;
-    }
+    return sessionToken.split(";")[0];
   }
-}
 
-export function clearSession(): void {
-  sessionCookie = null;
+  const allCookies = setCookie.map((c) => c.split(";")[0]).join("; ");
+  return allCookies || null;
 }

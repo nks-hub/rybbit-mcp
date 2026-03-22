@@ -2,7 +2,7 @@
  * HTTP client for Rybbit API requests.
  */
 
-import { AuthConfig, getAuthHeaders, clearSession } from "./auth.js";
+import { AuthConfig, getAuthHeaders } from "./auth.js";
 import { CHARACTER_LIMIT, REQUEST_TIMEOUT_MS } from "./constants.js";
 
 export interface FilterParam {
@@ -16,6 +16,8 @@ export interface QueryParams {
 }
 
 export class RybbitClient {
+  private sessionCookie: string | null = null;
+
   constructor(private config: AuthConfig) {}
 
   async get<T>(path: string, params?: QueryParams): Promise<T> {
@@ -59,7 +61,9 @@ export class RybbitClient {
     body?: unknown,
     isRetry = false
   ): Promise<T> {
-    const headers = await getAuthHeaders(this.config);
+    const auth = await getAuthHeaders(this.config, this.sessionCookie);
+    const headers = auth.headers;
+    this.sessionCookie = auth.sessionCookie;
 
     // Remove Content-Type for requests without body (DELETE, GET)
     if (!body) {
@@ -90,7 +94,7 @@ export class RybbitClient {
     }
 
     if (res.status === 401 && !isRetry && this.config.email) {
-      clearSession();
+      this.sessionCookie = null;
       return this.request<T>(method, url, body, true);
     }
 

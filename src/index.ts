@@ -23,7 +23,7 @@ async function main() {
   const server = new McpServer(
     {
       name: "rybbit-mcp",
-      version: "0.3.0",
+      version: "0.4.2",
     },
     {
       instructions:
