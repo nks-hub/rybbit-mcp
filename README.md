@@ -24,23 +24,9 @@ Instead of manually checking the Rybbit dashboard, let your AI assistant query a
 
 ## Quick Start
 
-### Installation
+### Installation (npx — recommended)
 
-```bash
-npm install -g @nks-hub/rybbit-mcp
-```
-
-Or clone and build:
-
-```bash
-git clone https://github.com/nks-hub/rybbit-mcp.git
-cd rybbit-mcp
-npm install && npm run build
-```
-
-### Configuration
-
-Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
+No install needed. Just configure your MCP client to run via `npx`:
 
 ```json
 {
@@ -48,6 +34,41 @@ Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
     "rybbit": {
       "command": "npx",
       "args": ["-y", "@nks-hub/rybbit-mcp"],
+      "env": {
+        "RYBBIT_URL": "https://your-rybbit-instance.com",
+        "RYBBIT_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+Add this to your `~/.claude/settings.json` or project `.claude/settings.json`.
+
+**CLI shorthand:**
+
+```bash
+claude mcp add rybbit -e RYBBIT_URL=https://your-instance.com -e RYBBIT_API_KEY=your-key -- npx -y @nks-hub/rybbit-mcp
+```
+
+### Installation (from source)
+
+For development or contributing:
+
+```bash
+git clone https://github.com/nks-hub/rybbit-mcp.git
+cd rybbit-mcp
+npm install && npm run build
+```
+
+Then point your MCP config to the local build:
+
+```json
+{
+  "mcpServers": {
+    "rybbit": {
+      "command": "node",
+      "args": ["path/to/rybbit-mcp/build/index.js"],
       "env": {
         "RYBBIT_URL": "https://your-rybbit-instance.com",
         "RYBBIT_API_KEY": "your-api-key"
@@ -67,7 +88,7 @@ Ask Claude Code anything about your analytics data. The MCP tools are automatica
 
 | Feature | Description |
 |---------|-------------|
-| **31 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management |
+| **32 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management |
 | **Flexible Auth** | API key (recommended) or email/password authentication |
 | **Smart Filtering** | Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types |
 | **Time Ranges** | Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`) |
@@ -91,14 +112,14 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 
 ---
 
-## Tools (31)
+## Tools (32)
 
 ### Configuration & Site Management
 | Tool | Description |
 |------|-------------|
 | `rybbit_get_config` | Get server version and configuration |
 | `rybbit_list_sites` | List all sites and organizations |
-| `rybbit_create_site` | Create a new site in an organization |
+| `rybbit_create_site` | Create a new site (type: `web` or `app` — app sites auto-disable bot filtering) |
 | `rybbit_delete_site` | Delete a site permanently |
 | `rybbit_get_site_id` | Look up site ID by domain name |
 | `rybbit_update_site_config` | Update site tracking config (IP, errors, replay, etc.) |
@@ -120,15 +141,16 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 ### Sessions
 | Tool | Description |
 |------|-------------|
-| `rybbit_list_sessions` | Session list with filtering and pagination |
+| `rybbit_list_sessions` | Session list with filtering by IP, identified users, min duration, and pagination |
 | `rybbit_get_session` | Full session detail with events and user traits |
 
 ### Users
 | Tool | Description |
 |------|-------------|
-| `rybbit_list_users` | Identified users with session counts and traits |
+| `rybbit_list_users` | Users with search, sort (first/last seen, pageviews, sessions, duration), and identified-only filter |
 | `rybbit_get_user` | User detail with traits and activity |
 | `rybbit_get_user_traits` | Trait keys, values, or find users by trait |
+| `rybbit_get_user_event_breakdown` | Per-user event count breakdown |
 
 ### Events
 | Tool | Description |

@@ -12,6 +12,7 @@ build/
 !.github/
 /[A-Z]*.md
 !/README.md
+!/SKILL.md
 
 # OS
 Thumbs.db
