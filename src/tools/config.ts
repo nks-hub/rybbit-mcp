@@ -27,6 +27,35 @@ interface Organization {
   [key: string]: unknown;
 }
 
+/**
+ * Fetch the user's organizations and attach each org's sites.
+ *
+ * The Rybbit Fastify server exposes:
+ *   - GET /api/user/organizations           — orgs the user belongs to (no nested sites)
+ *   - GET /api/organizations/:id/sites      — sites within an org
+ *
+ * The previous implementation called `/api/organizations`, which does not
+ * exist (returns 404) — see issue #1.
+ */
+async function fetchOrganizationsWithSites(
+  client: RybbitClient
+): Promise<Organization[]> {
+  const orgs = await client.get<Organization[]>("/user/organizations");
+  await Promise.all(
+    orgs.map(async (org) => {
+      try {
+        const res = await client.get<Site[] | { sites: Site[] }>(
+          `/organizations/${org.id}/sites`
+        );
+        org.sites = Array.isArray(res) ? res : res?.sites ?? [];
+      } catch {
+        org.sites = [];
+      }
+    })
+  );
+  return orgs;
+}
+
 export function registerConfigTools(
   server: McpServer,
   client: RybbitClient
@@ -91,7 +120,7 @@ export function registerConfigTools(
     },
     async () => {
       try {
-        const data = await client.get<Organization[]>("/organizations");
+        const data = await fetchOrganizationsWithSites(client);
 
         return {
           content: [
@@ -211,7 +240,7 @@ export function registerConfigTools(
     },
     async ({ domain }) => {
       try {
-        const orgs = await client.get<Organization[]>("/organizations");
+        const orgs = await fetchOrganizationsWithSites(client);
         const matches: { siteId: string; domain: string; name: string; organization: string }[] = [];
 
         for (const org of orgs) {
