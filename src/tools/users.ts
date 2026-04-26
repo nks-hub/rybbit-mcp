@@ -333,4 +333,61 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       }
     }
   );
+
+  server.registerTool(
+    "rybbit_get_user_session_count",
+    {
+      title: "User Session Count",
+      description:
+        "Get the per-day session count for a single user across the requested time range. Useful for plotting user engagement intensity (calendar heatmap or sparkline).",
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
+      inputSchema: {
+        siteId: siteIdSchema,
+        userId: z.string().describe("User ID — either identified_user_id or device hash user_id"),
+        startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+        endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
+        timeZone: z.string().optional().describe("IANA timezone (default UTC)"),
+        pastMinutesStart: z.number().optional(),
+        pastMinutesEnd: z.number().optional(),
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, userId, ...rest } = args as {
+          siteId: string;
+          userId: string;
+          startDate?: string;
+          endDate?: string;
+          timeZone?: string;
+          pastMinutesStart?: number;
+          pastMinutesEnd?: number;
+        };
+
+        const params: QueryParams = {
+          ...client.buildAnalyticsParams(rest),
+          userId,
+        };
+
+        const data = await client.get(
+          `/sites/${siteId}/users/session-count`,
+          params
+        );
+
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
 }

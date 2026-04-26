@@ -269,9 +269,44 @@ export function registerConfigTools(
         "Update configuration for an existing Rybbit site. Toggle tracking features like IP tracking, session replay, error tracking, button clicks, etc.",
       inputSchema: {
         siteId: siteIdSchema,
+        // Site identity
+        name: z
+          .string()
+          .min(1)
+          .max(255)
+          .optional()
+          .describe("Display name for the site"),
+        domain: z
+          .string()
+          .min(1)
+          .max(253)
+          .optional()
+          .describe("Domain (web sites) or package name (app sites). Normalized server-side."),
+        // Privacy & filtering
         public: z.boolean().optional().describe("Make site stats publicly accessible"),
         saltUserIds: z.boolean().optional().describe("Salt user IDs for privacy"),
         blockBots: z.boolean().optional().describe("Block known bots from tracking"),
+        excludedIPs: z
+          .array(z.string().min(1))
+          .max(100)
+          .optional()
+          .describe("IP addresses or CIDR ranges to exclude from tracking (max 100)"),
+        excludedCountries: z
+          .array(
+            z
+              .string()
+              .length(2)
+              .regex(/^[A-Z]{2}$/, "2-letter ISO country code (e.g. US, GB)")
+          )
+          .max(250)
+          .optional()
+          .describe("ISO 3166-1 alpha-2 country codes to exclude from tracking (max 250)"),
+        tags: z
+          .array(z.string().min(1).max(50))
+          .max(20)
+          .optional()
+          .describe("Tags for grouping/filtering sites (max 20, each up to 50 chars)"),
+        // Tracking toggles
         trackIp: z.boolean().optional().describe("Track visitor IP addresses"),
         trackErrors: z.boolean().optional().describe("Track JavaScript errors"),
         trackOutbound: z.boolean().optional().describe("Track outbound link clicks"),
@@ -367,6 +402,82 @@ export function registerConfigTools(
               }),
             },
           ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_site_has_data",
+    {
+      title: "Site Has Data",
+      description:
+        "Check whether a site has received any tracking events yet. Useful for verifying SDK integration before drilling into analytics.",
+      inputSchema: {
+        siteId: siteIdSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ siteId }) => {
+      try {
+        const data = await client.get<{ hasData: boolean }>(
+          `/sites/${siteId}/has-data`
+        );
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_get_page_titles",
+    {
+      title: "Get Page Titles",
+      description:
+        "Get the most-viewed page titles for a site, broken down by pageviews and unique sessions. Complements rybbit_get_metric with parameter='pathname' by giving the human-readable page title instead of just the path.",
+      inputSchema: {
+        ...analyticsInputSchema,
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, ...rest } = args as {
+          siteId: string;
+          startDate?: string;
+          endDate?: string;
+          timeZone?: string;
+          filters?: Array<{ parameter: string; type: string; value: (string | number)[] }>;
+          pastMinutesStart?: number;
+          pastMinutesEnd?: number;
+        };
+        const params = client.buildAnalyticsParams(rest);
+        const data = await client.get(`/sites/${siteId}/page-titles`, params);
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

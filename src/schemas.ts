@@ -9,11 +9,61 @@ export const siteIdSchema = z
   .transform((v) => String(v))
   .describe("Site ID (numeric ID or domain identifier)");
 
+/**
+ * Full list of filter dimensions supported by Rybbit's getFilterStatement.
+ * Sourced from `shared/src/filters.ts` (FilterParameter union type).
+ */
+const FILTER_DIMENSIONS = [
+  "browser",
+  "browser_version",
+  "operating_system",
+  "operating_system_version",
+  "language",
+  "country",
+  "region",
+  "city",
+  "device_type",
+  "device_model",
+  "app_version",
+  "dimensions",
+  "referrer",
+  "hostname",
+  "pathname",
+  "page_title",
+  "querystring",
+  "event_name",
+  "channel",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "entry_page",
+  "exit_page",
+  "user_id",
+  "lat",
+  "lon",
+  "timezone",
+  "vpn",
+  "crawler",
+  "datacenter",
+  "company",
+  "company_type",
+  "company_domain",
+  "asn_org",
+  "asn_type",
+  "asn_domain",
+  "tag",
+] as const;
+
 export const filterSchema = z.object({
   parameter: z
     .string()
     .describe(
-      "Filter dimension: browser, operating_system, language, country, region, city, device_type, referrer, hostname, pathname, page_title, querystring, event_name, channel, utm_source, utm_medium, utm_campaign, utm_term, utm_content, entry_page, exit_page, user_id. Note: user_id filter checks BOTH the device hash (user_id) and app-provided ID (identified_user_id)."
+      `Filter dimension. One of: ${FILTER_DIMENSIONS.join(", ")}. ` +
+        `Custom URL parameters use the prefix 'url_param:NAME' (e.g., 'url_param:campaign_id'). ` +
+        `Note: user_id filter checks BOTH the device hash (user_id) and app-provided ID (identified_user_id). ` +
+        `device_model and app_version are populated only for app-type sites tracked via SDK.`
     ),
   type: z
     .enum([
@@ -89,12 +139,17 @@ export const paginationSchema = {
 export const metricParameterSchema = z
   .enum([
     "browser",
+    "browser_version",
     "operating_system",
+    "operating_system_version",
     "language",
     "country",
     "region",
     "city",
     "device_type",
+    "device_model",
+    "app_version",
+    "dimensions",
     "referrer",
     "hostname",
     "pathname",
@@ -109,5 +164,12 @@ export const metricParameterSchema = z
     "utm_content",
     "entry_page",
     "exit_page",
+    "timezone",
+    "company",
+    "company_type",
+    "asn_org",
+    "asn_type",
   ])
-  .describe("Metric dimension to break down by");
+  .describe(
+    "Metric dimension to break down by. device_model and app_version apply only to app-type sites tracked via SDK."
+  );

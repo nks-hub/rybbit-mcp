@@ -260,4 +260,95 @@ export function registerFunnelsTools(
       }
     }
   );
+
+  server.registerTool(
+    "rybbit_create_funnel",
+    {
+      title: "Create Funnel",
+      description:
+        "Save a new named funnel definition. Steps are evaluated in order. Pass an existing funnel report ID to overwrite that funnel instead of creating a new one.",
+      annotations: {
+        readOnlyHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+        destructiveHint: false,
+      },
+      inputSchema: {
+        siteId: siteIdSchema,
+        name: z.string().min(1).describe("Funnel display name"),
+        steps: z
+          .array(
+            z.object({
+              value: z.string().describe("Page path or event name"),
+              type: z.enum(["page", "event"]).describe("Step type"),
+              name: z.string().optional().describe("Display name for the step"),
+            })
+          )
+          .min(2)
+          .describe("Funnel steps in order (minimum 2)"),
+        reportId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Optional existing funnel report ID to overwrite (instead of creating a new one)"),
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, ...body } = args as {
+          siteId: string;
+          name: string;
+          steps: FunnelStep[];
+          reportId?: number;
+        };
+
+        const data = await client.post(`/sites/${siteId}/funnels`, body);
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "rybbit_delete_funnel",
+    {
+      title: "Delete Funnel",
+      description: "Permanently delete a saved funnel. This action cannot be undone.",
+      annotations: {
+        readOnlyHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+        destructiveHint: true,
+      },
+      inputSchema: {
+        siteId: siteIdSchema,
+        funnelId: z
+          .union([z.string(), z.number()])
+          .describe("Funnel ID to delete (from rybbit_list_funnels)"),
+      },
+    },
+    async (args) => {
+      try {
+        const { siteId, funnelId } = args as { siteId: string; funnelId: string | number };
+        const data = await client.delete(`/sites/${siteId}/funnels/${funnelId}`);
+        return {
+          content: [{ type: "text" as const, text: truncateResponse(data) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
 }
