@@ -301,7 +301,9 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
             hasMore = false;
             break;
           }
-          if (rows.length < pageSize) break;
+          // Don't exit on rows.length < pageSize — backend may return fewer
+          // than requested even when more data exists (it caps internally).
+          // Rely solely on cursor.hasMore, which was already checked above.
         }
 
         // Filter scanned events down to matches.
@@ -462,7 +464,9 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
             hasMore = false;
             break;
           }
-          if (rows.length < pageSize) break;
+          // Don't exit on rows.length < pageSize — backend may return fewer
+          // than requested even when more data exists (it caps internally).
+          // Rely solely on cursor.hasMore, which was already checked above.
         }
 
         const filtered = seen.filter((row) => {
