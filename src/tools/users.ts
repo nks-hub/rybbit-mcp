@@ -41,8 +41,23 @@ const userDetailOutput = {
 };
 
 const userTraitsOutput = {
-  keys: z.array(z.string()).optional(),
-  values: z.array(z.record(z.unknown())).optional(),
+  // mode=keys returns array of { key, userCount } objects (not bare strings);
+  // accept either shape so old and new payloads validate.
+  keys: z
+    .array(
+      z.union([
+        z.string(),
+        z
+          .object({
+            key: z.string().optional(),
+            userCount: z.number().optional(),
+            count: z.number().optional(),
+          })
+          .passthrough(),
+      ])
+    )
+    .optional(),
+  values: z.array(z.record(z.string(), z.unknown())).optional(),
   data: z.unknown().optional(),
 };
 
