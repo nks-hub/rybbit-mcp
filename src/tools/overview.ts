@@ -18,6 +18,49 @@ interface TimeseriesDataPoint {
   [key: string]: unknown;
 }
 
+// Output schemas
+const liveUsersOutput = {
+  liveUsers: z.number().describe("Current live/active user count"),
+};
+
+const overviewOutput = {
+  sessions: z.number().optional(),
+  pageviews: z.number().optional(),
+  users: z.number().optional(),
+  pagesPerSession: z.number().optional(),
+  bounceRate: z.number().optional(),
+  avgSessionDuration: z.number().optional(),
+};
+
+const overviewTimeseriesOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          time: z.string().optional(),
+        })
+        .passthrough()
+    )
+    .describe("Time-bucketed overview metrics"),
+};
+
+const sessionLocationsOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          lat: z.number().optional(),
+          lon: z.number().optional(),
+          city: z.string().optional(),
+          country: z.string().optional(),
+          sessions: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Geographic session locations"),
+};
+
 export function registerOverviewTools(
   server: McpServer,
   client: RybbitClient
@@ -31,11 +74,16 @@ export function registerOverviewTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
+      outputSchema: liveUsersOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Reading live users…",
+        "openai/toolInvocation/invoked": "Live users loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async (args) => {
@@ -44,11 +92,14 @@ export function registerOverviewTools(
           `/sites/${args.siteId}/live-user-count`
         );
 
+        const result = { liveUsers: count };
+
         return {
+          structuredContent: result as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse({ liveUsers: count }),
+              text: truncateResponse(result),
             },
           ],
         };
@@ -71,11 +122,16 @@ export function registerOverviewTools(
       inputSchema: {
         ...analyticsInputSchema,
       },
+      outputSchema: overviewOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Querying overview…",
+        "openai/toolInvocation/invoked": "Overview loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async (args) => {
@@ -95,6 +151,7 @@ export function registerOverviewTools(
         );
 
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -122,11 +179,16 @@ export function registerOverviewTools(
         ...analyticsInputSchema,
         bucket: bucketSchema,
       },
+      outputSchema: overviewTimeseriesOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Querying timeseries…",
+        "openai/toolInvocation/invoked": "Timeseries loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async (args) => {
@@ -146,7 +208,10 @@ export function registerOverviewTools(
           params
         );
 
+        const wrapped = { data };
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -174,11 +239,16 @@ export function registerOverviewTools(
         ...analyticsInputSchema,
         ...paginationSchema,
       },
+      outputSchema: sessionLocationsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading locations…",
+        "openai/toolInvocation/invoked": "Locations loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async (args) => {
@@ -190,7 +260,10 @@ export function registerOverviewTools(
           params
         );
 
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,

@@ -13,6 +13,33 @@ interface Goal {
   [key: string]: unknown;
 }
 
+// Output schemas
+const goalShape = z
+  .object({
+    id: z.union([z.string(), z.number()]).optional(),
+    name: z.string().optional(),
+    type: z.string().optional(),
+    value: z.string().optional(),
+    conversions: z.number().optional(),
+    conversionRate: z.number().optional(),
+  })
+  .passthrough();
+
+const listGoalsOutput = {
+  data: z.array(goalShape).describe("Goals with conversion metrics"),
+};
+
+const goalSessionsOutput = {
+  data: z.array(z.record(z.unknown())).optional().describe("Sessions that hit the goal"),
+};
+
+const goalMutationOutput = {
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+};
+
 export function registerGoalsTools(
   server: McpServer,
   client: RybbitClient
@@ -26,7 +53,7 @@ export function registerGoalsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -56,6 +83,11 @@ export function registerGoalsTools(
           .optional()
           .describe("Minutes ago end"),
       },
+      outputSchema: listGoalsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Listing goals…",
+        "openai/toolInvocation/invoked": "Goals loaded",
+      },
     },
     async (args) => {
       try {
@@ -79,7 +111,9 @@ export function registerGoalsTools(
           `/sites/${siteId}/goals`,
           params
         );
+        const wrapped = { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -101,7 +135,7 @@ export function registerGoalsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -135,6 +169,11 @@ export function registerGoalsTools(
           .describe("Minutes ago end"),
         ...paginationSchema,
       },
+      outputSchema: goalSessionsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading sessions…",
+        "openai/toolInvocation/invoked": "Sessions loaded",
+      },
     },
     async (args) => {
       try {
@@ -161,7 +200,9 @@ export function registerGoalsTools(
           `/sites/${siteId}/goals/${goalId}/sessions`,
           params
         );
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -214,7 +255,7 @@ export function registerGoalsTools(
       annotations: {
         readOnlyHint: false,
         idempotentHint: false,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -222,6 +263,11 @@ export function registerGoalsTools(
         name: z.string().optional().describe("Optional display name for the goal"),
         goalType: z.enum(["path", "event"]).describe("'path' = URL pattern, 'event' = custom event"),
         config: goalConfigSchema,
+      },
+      outputSchema: goalMutationOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Creating goal…",
+        "openai/toolInvocation/invoked": "Goal created",
       },
     },
     async (args) => {
@@ -234,7 +280,11 @@ export function registerGoalsTools(
         };
 
         const data = await client.post(`/sites/${siteId}/goals`, body);
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -255,7 +305,7 @@ export function registerGoalsTools(
       annotations: {
         readOnlyHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -264,6 +314,11 @@ export function registerGoalsTools(
         name: z.string().optional(),
         goalType: z.enum(["path", "event"]),
         config: goalConfigSchema,
+      },
+      outputSchema: goalMutationOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Updating goal…",
+        "openai/toolInvocation/invoked": "Goal updated",
       },
     },
     async (args) => {
@@ -283,7 +338,11 @@ export function registerGoalsTools(
           goalId,
           siteId: numericSiteId,
         });
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -304,19 +363,28 @@ export function registerGoalsTools(
       annotations: {
         readOnlyHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: true,
       },
       inputSchema: {
         siteId: siteIdSchema,
         goalId: z.number().int().positive().describe("Numeric goal ID to delete"),
       },
+      outputSchema: goalMutationOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Deleting goal…",
+        "openai/toolInvocation/invoked": "Goal deleted",
+      },
     },
     async (args) => {
       try {
         const { siteId, goalId } = args as { siteId: string; goalId: number };
         const data = await client.delete(`/sites/${siteId}/goals/${goalId}`);
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { success: true };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

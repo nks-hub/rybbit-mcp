@@ -31,6 +31,47 @@ interface AggregatedUser {
   device_type: string;
 }
 
+// Output schemas
+const listUsersOutput = {
+  data: z.array(z.record(z.unknown())).optional().describe("User rows"),
+};
+
+const userDetailOutput = {
+  data: z.unknown().optional().describe("User detail payload"),
+};
+
+const userTraitsOutput = {
+  keys: z.array(z.string()).optional(),
+  values: z.array(z.record(z.unknown())).optional(),
+  data: z.unknown().optional(),
+};
+
+const userEventBreakdownOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          event_name: z.string().optional(),
+          count: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .optional(),
+};
+
+const userSessionCountOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          date: z.string().optional(),
+          sessions: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .optional(),
+};
+
 async function fetchUsersByDuration(
   client: RybbitClient,
   siteId: string,
@@ -111,7 +152,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     "rybbit_list_users",
     {
       title: "List Users",
-      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
         "List users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. Supports filtering by any analytics dimension. Use 'search' param to find users by username/email/name (case-insensitive partial match).",
       inputSchema: {
@@ -138,6 +179,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .optional()
           .describe("Sort direction (default: 'desc')"),
       },
+      outputSchema: listUsersOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Listing users…",
+        "openai/toolInvocation/invoked": "Users loaded",
+      },
     },
     async (args) => {
       try {
@@ -153,6 +199,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
             limit: args.limit,
           });
           return {
+            structuredContent: data as unknown as Record<string, unknown>,
             content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
@@ -178,7 +225,12 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           ? "\n\nNote: event_name filter was removed (not supported for user listing due to backend limitation). Use rybbit_get_user_event_breakdown to find users by specific events."
           : "";
 
+        const wrapped = Array.isArray(data)
+          ? { data }
+          : (data as Record<string, unknown>);
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) + warning }],
         };
       } catch (err) {
@@ -195,18 +247,27 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     "rybbit_get_user",
     {
       title: "User Detail",
-      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
         "Get detailed information about a specific user including their traits, session history, and activity summary.",
       inputSchema: {
         siteId: siteIdSchema,
         userId: z.string().describe("User ID (identified_user_id or internal user ID)"),
       },
+      outputSchema: userDetailOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading user…",
+        "openai/toolInvocation/invoked": "User loaded",
+      },
     },
     async (args) => {
       try {
         const data = await client.get(`/sites/${args.siteId}/users/${args.userId}`);
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -223,7 +284,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     "rybbit_get_user_traits",
     {
       title: "User Traits",
-      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
         "Get user trait keys, values, or find users by trait. mode='keys' lists all trait keys. mode='values' (default when key is provided) returns distinct values for a trait key. mode='users' finds users matching a specific trait key+value pair (case-insensitive).",
       inputSchema: {
@@ -243,6 +304,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .optional()
           .describe("Trait value (required for 'users' mode)"),
         limit: z.number().optional().describe("Max results to return"),
+      },
+      outputSchema: userTraitsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading traits…",
+        "openai/toolInvocation/invoked": "Traits loaded",
       },
     },
     async (args) => {
@@ -275,7 +341,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         } else {
           data = await client.get(`/sites/${args.siteId}/user-traits/keys`);
         }
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -295,7 +365,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     "rybbit_get_user_event_breakdown",
     {
       title: "User Event Breakdown",
-      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true, destructiveHint: false },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
         "Get event count breakdown for a specific user. Shows how many times each event_name was triggered by this user. " +
         "Accepts either the Rybbit user_id (device hash) or the identified_user_id (app-provided user ID). " +
@@ -303,6 +373,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       inputSchema: {
         ...analyticsInputSchema,
         userId: z.string().describe("User ID — either Rybbit device hash (user_id) or app-provided ID (identified_user_id). Both are checked."),
+      },
+      outputSchema: userEventBreakdownOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading breakdown…",
+        "openai/toolInvocation/invoked": "Breakdown loaded",
       },
     },
     async (args) => {
@@ -321,7 +396,10 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const params = client.buildAnalyticsParams(safeArgs);
         const data = await client.get(`/sites/${args.siteId}/events/names`, params);
 
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -343,7 +421,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -354,6 +432,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         timeZone: z.string().optional().describe("IANA timezone (default UTC)"),
         pastMinutesStart: z.number().optional(),
         pastMinutesEnd: z.number().optional(),
+      },
+      outputSchema: userSessionCountOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Counting sessions…",
+        "openai/toolInvocation/invoked": "Counts loaded",
       },
     },
     async (args) => {
@@ -378,7 +461,10 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           params
         );
 
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

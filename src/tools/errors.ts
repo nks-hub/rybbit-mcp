@@ -17,6 +17,28 @@ interface ErrorEvent {
   [key: string]: unknown;
 }
 
+// Output schema — single union covering names, events, and timeseries shapes
+const errorsOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          // names rows
+          name: z.string().optional(),
+          count: z.number().optional(),
+          // event rows
+          id: z.string().optional(),
+          message: z.string().optional(),
+          stack: z.string().optional(),
+          // timeseries rows
+          time: z.string().optional(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Error rows — shape depends on `type` input (names | events | timeseries)"),
+};
+
 export function registerErrorsTools(
   server: McpServer,
   client: RybbitClient
@@ -30,7 +52,7 @@ export function registerErrorsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -50,6 +72,11 @@ export function registerErrorsTools(
           .enum(["minute", "five_minutes", "hour", "day", "week", "month"])
           .optional()
           .describe("Time bucket for timeseries type (default: day)"),
+      },
+      outputSchema: errorsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading errors…",
+        "openai/toolInvocation/invoked": "Errors loaded",
       },
     },
     async (args) => {
@@ -87,7 +114,9 @@ export function registerErrorsTools(
             `/sites/${siteId}/error-bucketed`,
             params
           );
+          const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
           return {
+            structuredContent: wrapped as unknown as Record<string, unknown>,
             content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
@@ -104,7 +133,9 @@ export function registerErrorsTools(
             `/sites/${siteId}/error-events`,
             params
           );
+          const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
           return {
+            structuredContent: wrapped as unknown as Record<string, unknown>,
             content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
@@ -113,7 +144,9 @@ export function registerErrorsTools(
           `/sites/${siteId}/error-names`,
           params
         );
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

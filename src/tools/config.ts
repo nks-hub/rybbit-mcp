@@ -27,6 +27,85 @@ interface Organization {
   [key: string]: unknown;
 }
 
+// Output schemas
+const configOutput = {
+  version: z.string().optional().describe("Rybbit server version string"),
+  disableSignup: z.boolean().optional().describe("Whether public signup is disabled"),
+  mapboxToken: z.string().optional().describe("Mapbox token (if configured)"),
+};
+
+const siteOutput = {
+  id: z.union([z.string(), z.number()]).optional(),
+  domain: z.string().optional(),
+  name: z.string().optional(),
+  organizationId: z.union([z.string(), z.number()]).optional(),
+};
+
+const listSitesOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          id: z.union([z.string(), z.number()]),
+          name: z.string(),
+          sites: z.array(z.object(siteOutput).passthrough()).optional(),
+        })
+        .passthrough()
+    )
+    .describe("Organizations with nested sites"),
+};
+
+const createSiteOutput = {
+  message: z.string().optional(),
+  siteId: z.union([z.string(), z.number()]).optional(),
+  domain: z.string().optional(),
+  name: z.string().optional(),
+  organizationId: z.union([z.string(), z.number()]).optional(),
+};
+
+const getSiteIdOutput = {
+  matches: z
+    .array(
+      z.object({
+        siteId: z.union([z.string(), z.number()]),
+        domain: z.string(),
+        name: z.string(),
+        organization: z.string(),
+      })
+    )
+    .optional()
+    .describe("Matching sites"),
+  message: z.string().optional().describe("Diagnostic message when no match"),
+};
+
+const updateSiteConfigOutput = {
+  success: z.boolean().optional(),
+  config: z.record(z.unknown()).optional(),
+};
+
+const deleteSiteOutput = {
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+};
+
+const siteHasDataOutput = {
+  hasData: z.boolean().describe("Whether the site has received any tracking events"),
+};
+
+const pageTitlesOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          value: z.string().optional(),
+          pageviews: z.number().optional(),
+          sessions: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .optional(),
+};
+
 export function registerConfigTools(
   server: McpServer,
   client: RybbitClient
@@ -37,11 +116,16 @@ export function registerConfigTools(
       title: "Get Rybbit Config",
       description: "Get Rybbit server version and configuration",
       inputSchema: {},
+      outputSchema: configOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading config…",
+        "openai/toolInvocation/invoked": "Config loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async () => {
@@ -58,6 +142,7 @@ export function registerConfigTools(
         };
 
         return {
+          structuredContent: combined as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -82,18 +167,25 @@ export function registerConfigTools(
       description:
         "List all sites and organizations the authenticated user has access to",
       inputSchema: {},
+      outputSchema: listSitesOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Listing sites…",
+        "openai/toolInvocation/invoked": "Sites listed",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async () => {
       try {
         const data = await client.get<Organization[]>("/organizations");
+        const wrapped = { data };
 
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -135,11 +227,16 @@ export function registerConfigTools(
           .optional()
           .describe("Site type: 'web' for websites (default), 'app' for mobile apps"),
       },
+      outputSchema: createSiteOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Creating site…",
+        "openai/toolInvocation/invoked": "Site created",
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async ({ domain, name, organizationId, type }) => {
@@ -165,17 +262,20 @@ export function registerConfigTools(
           }
         }
 
+        const result = {
+          message: `Site '${data.domain}' created successfully${isApp ? " (blockBots disabled for app site)" : ""}`,
+          siteId: data.id,
+          domain: data.domain,
+          name: data.name,
+          organizationId: data.organizationId,
+        };
+
         return {
+          structuredContent: result as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse({
-                message: `Site '${data.domain}' created successfully${isApp ? " (blockBots disabled for app site)" : ""}`,
-                siteId: data.id,
-                domain: data.domain,
-                name: data.name,
-                organizationId: data.organizationId,
-              }),
+              text: truncateResponse(result),
             },
           ],
         };
@@ -202,11 +302,16 @@ export function registerConfigTools(
             "Domain to search for (e.g. 'example.com'). Partial match supported."
           ),
       },
+      outputSchema: getSiteIdOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Looking up site…",
+        "openai/toolInvocation/invoked": "Lookup done",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async ({ domain }) => {
@@ -231,17 +336,25 @@ export function registerConfigTools(
         }
 
         if (matches.length === 0) {
+          const noMatch = {
+            matches: [],
+            message: `No site found matching '${domain}'. Use rybbit_list_sites to see all available sites, or rybbit_create_site to create one.`,
+          };
           return {
+            structuredContent: noMatch as unknown as Record<string, unknown>,
             content: [
               {
                 type: "text" as const,
-                text: `No site found matching '${domain}'. Use rybbit_list_sites to see all available sites, or rybbit_create_site to create one.`,
+                text: noMatch.message,
               },
             ],
           };
         }
 
+        const result = { matches };
+
         return {
+          structuredContent: result as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -319,11 +432,16 @@ export function registerConfigTools(
         sessionReplay: z.boolean().optional().describe("Enable session replay recording"),
         webVitals: z.boolean().optional().describe("Track Core Web Vitals metrics"),
       },
+      outputSchema: updateSiteConfigOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Updating site config…",
+        "openai/toolInvocation/invoked": "Config updated",
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async ({ siteId, ...config }) => {
@@ -337,7 +455,12 @@ export function registerConfigTools(
         }
 
         if (Object.keys(body).length === 0) {
+          const noChange = {
+            success: false,
+            config: {} as Record<string, unknown>,
+          };
           return {
+            structuredContent: noChange as unknown as Record<string, unknown>,
             content: [
               {
                 type: "text" as const,
@@ -353,6 +476,7 @@ export function registerConfigTools(
         );
 
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -379,11 +503,16 @@ export function registerConfigTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
+      outputSchema: deleteSiteOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Deleting site…",
+        "openai/toolInvocation/invoked": "Site deleted",
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
         idempotentHint: false,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async ({ siteId }) => {
@@ -392,14 +521,17 @@ export function registerConfigTools(
           `/sites/${siteId}`
         );
 
+        const result = {
+          message: `Site '${siteId}' deleted successfully`,
+          ...data,
+        };
+
         return {
+          structuredContent: result as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse({
-                message: `Site '${siteId}' deleted successfully`,
-                ...data,
-              }),
+              text: truncateResponse(result),
             },
           ],
         };
@@ -422,11 +554,16 @@ export function registerConfigTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
+      outputSchema: siteHasDataOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Checking data…",
+        "openai/toolInvocation/invoked": "Check complete",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async ({ siteId }) => {
@@ -435,6 +572,7 @@ export function registerConfigTools(
           `/sites/${siteId}/has-data`
         );
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -456,11 +594,16 @@ export function registerConfigTools(
       inputSchema: {
         ...analyticsInputSchema,
       },
+      outputSchema: pageTitlesOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading page titles…",
+        "openai/toolInvocation/invoked": "Titles loaded",
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
       },
     },
     async (args) => {
@@ -476,7 +619,9 @@ export function registerConfigTools(
         };
         const params = client.buildAnalyticsParams(rest);
         const data = await client.get(`/sites/${siteId}/page-titles`, params);
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

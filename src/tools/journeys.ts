@@ -10,6 +10,21 @@ interface JourneyPath {
   [key: string]: unknown;
 }
 
+// Output schema
+const journeysOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          path: z.array(z.string()).optional(),
+          sessions: z.number().optional(),
+          percentage: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .describe("Journey paths with session counts"),
+};
+
 export function registerJourneysTools(
   server: McpServer,
   client: RybbitClient
@@ -23,7 +38,7 @@ export function registerJourneysTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -65,6 +80,11 @@ export function registerJourneysTools(
           .optional()
           .describe("Max number of journey paths to return (default 100)"),
       },
+      outputSchema: journeysOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading journeys…",
+        "openai/toolInvocation/invoked": "Journeys loaded",
+      },
     },
     async (args) => {
       try {
@@ -93,7 +113,9 @@ export function registerJourneysTools(
           `/sites/${siteId}/journeys`,
           params
         );
+        const wrapped = { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

@@ -44,6 +44,54 @@ const dimensionSchema = z
     "Break down performance by dimension. Default: overview (aggregated)"
   );
 
+// Output schemas
+const performanceOutput = {
+  // Overview percentiles (when dimension=overview or unset)
+  lcp_p50: z.number().optional(),
+  lcp_p75: z.number().optional(),
+  lcp_p90: z.number().optional(),
+  lcp_p99: z.number().optional(),
+  cls_p50: z.number().optional(),
+  cls_p75: z.number().optional(),
+  cls_p90: z.number().optional(),
+  cls_p99: z.number().optional(),
+  inp_p50: z.number().optional(),
+  inp_p75: z.number().optional(),
+  inp_p90: z.number().optional(),
+  inp_p99: z.number().optional(),
+  fcp_p50: z.number().optional(),
+  fcp_p75: z.number().optional(),
+  fcp_p90: z.number().optional(),
+  fcp_p99: z.number().optional(),
+  ttfb_p50: z.number().optional(),
+  ttfb_p75: z.number().optional(),
+  ttfb_p90: z.number().optional(),
+  ttfb_p99: z.number().optional(),
+  // Dimension breakdown rows (when dimension=pathname/browser/operating_system)
+  data: z
+    .array(
+      z
+        .object({
+          dimension: z.string().optional(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Per-dimension rows when dimension!=overview"),
+};
+
+const performanceTimeseriesOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          bucket: z.string().optional(),
+        })
+        .passthrough()
+    )
+    .describe("Time-bucketed performance metrics"),
+};
+
 export function registerPerformanceTools(
   server: McpServer,
   client: RybbitClient
@@ -57,12 +105,17 @@ export function registerPerformanceTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         ...analyticsInputSchema,
         dimension: dimensionSchema,
+      },
+      outputSchema: performanceOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading web vitals…",
+        "openai/toolInvocation/invoked": "Web vitals loaded",
       },
     },
     async (args) => {
@@ -94,7 +147,9 @@ export function registerPerformanceTools(
             `/sites/${siteId}/performance/by-dimension`,
             params
           );
+          const wrapped = { data };
           return {
+            structuredContent: wrapped as unknown as Record<string, unknown>,
             content: [{ type: "text" as const, text: truncateResponse(data) }],
           };
         }
@@ -104,6 +159,7 @@ export function registerPerformanceTools(
           params
         );
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -125,12 +181,17 @@ export function registerPerformanceTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         ...analyticsInputSchema,
         bucket: bucketSchema,
+      },
+      outputSchema: performanceTimeseriesOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Querying timeseries…",
+        "openai/toolInvocation/invoked": "Timeseries loaded",
       },
     },
     async (args) => {
@@ -156,7 +217,9 @@ export function registerPerformanceTools(
           `/sites/${siteId}/performance/time-series`,
           params
         );
+        const wrapped = { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {

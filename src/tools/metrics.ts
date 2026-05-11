@@ -22,6 +22,36 @@ interface RetentionData {
   [key: string]: unknown;
 }
 
+// Output schemas
+const metricOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          value: z.string().optional(),
+          count: z.number().optional(),
+          percentage: z.number().optional(),
+          bounceRate: z.number().optional(),
+          timeOnPage: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .describe("Metric breakdown rows"),
+};
+
+const retentionOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          cohort: z.string().optional(),
+          periods: z.array(z.number()).optional(),
+        })
+        .passthrough()
+    )
+    .describe("Retention cohorts"),
+};
+
 export function registerMetricsTools(
   server: McpServer,
   client: RybbitClient
@@ -35,13 +65,18 @@ export function registerMetricsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         ...analyticsInputSchema,
         parameter: metricParameterSchema,
         ...paginationSchema,
+      },
+      outputSchema: metricOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Querying metric…",
+        "openai/toolInvocation/invoked": "Metric loaded",
       },
     },
     async (args) => {
@@ -67,7 +102,10 @@ export function registerMetricsTools(
           params
         );
 
+        const wrapped = { data };
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -94,11 +132,16 @@ export function registerMetricsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         ...analyticsInputSchema,
+      },
+      outputSchema: retentionOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading retention…",
+        "openai/toolInvocation/invoked": "Retention loaded",
       },
     },
     async (args) => {
@@ -120,7 +163,10 @@ export function registerMetricsTools(
           params
         );
 
+        const wrapped = { data };
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,

@@ -33,6 +33,39 @@ interface SessionDetail {
   [key: string]: unknown;
 }
 
+// Output schemas
+const sessionSummaryShape = z
+  .object({
+    sessionId: z.string().optional(),
+    userId: z.string().optional(),
+    device: z.string().optional(),
+    country: z.string().optional(),
+    city: z.string().optional(),
+    pagesVisited: z.number().optional(),
+    duration: z.number().optional(),
+    bounced: z.boolean().optional(),
+  })
+  .passthrough();
+
+const listSessionsOutput = {
+  data: z.array(sessionSummaryShape).optional().describe("Sessions"),
+  filteredBy: z.string().optional().describe("Client-side filter applied (e.g. ip=...)"),
+  scannedPages: z.number().optional().describe("Pages scanned when filtering client-side"),
+};
+
+const sessionDetailOutput = {
+  sessionId: z.string().optional(),
+  userId: z.string().optional(),
+  traits: z.record(z.unknown()).optional(),
+  device: z.string().optional(),
+  browser: z.string().optional(),
+  os: z.string().optional(),
+  country: z.string().optional(),
+  region: z.string().optional(),
+  city: z.string().optional(),
+  events: z.array(z.unknown()).optional(),
+};
+
 export function registerSessionsTools(
   server: McpServer,
   client: RybbitClient
@@ -46,7 +79,7 @@ export function registerSessionsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -64,6 +97,11 @@ export function registerSessionsTools(
           .number()
           .optional()
           .describe("Minimum session duration in seconds."),
+      },
+      outputSchema: listSessionsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Listing sessions…",
+        "openai/toolInvocation/invoked": "Sessions loaded",
       },
     },
     async (args) => {
@@ -114,22 +152,32 @@ export function registerSessionsTools(
             fetchPage++;
           }
 
+          const filteredResult = {
+            data: allSessions,
+            filteredBy: `ip=${ip}`,
+            scannedPages: fetchPage,
+          };
+
           return {
+            structuredContent: filteredResult as unknown as Record<string, unknown>,
             content: [
               {
                 type: "text" as const,
-                text: truncateResponse({ data: allSessions, filteredBy: `ip=${ip}`, scannedPages: fetchPage }),
+                text: truncateResponse(filteredResult),
               },
             ],
           };
         }
 
-        const data = await client.get<SessionSummary[]>(
+        const data = await client.get<SessionSummary[] | { data: SessionSummary[] }>(
           `/sites/${siteId}/sessions`,
           params
         );
 
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
+
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
@@ -156,12 +204,17 @@ export function registerSessionsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         siteId: siteIdSchema,
         sessionId: z.string().describe("Session ID to retrieve"),
+      },
+      outputSchema: sessionDetailOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading session…",
+        "openai/toolInvocation/invoked": "Session loaded",
       },
     },
     async (args) => {
@@ -176,6 +229,7 @@ export function registerSessionsTools(
         );
 
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,

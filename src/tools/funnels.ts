@@ -27,6 +27,60 @@ interface FunnelAnalysisResult {
   [key: string]: unknown;
 }
 
+// Output schemas
+const funnelStepShape = z
+  .object({
+    value: z.string().optional(),
+    type: z.enum(["page", "event"]).optional(),
+    name: z.string().optional(),
+  })
+  .passthrough();
+
+const listFunnelsOutput = {
+  data: z
+    .array(
+      z
+        .object({
+          id: z.union([z.string(), z.number()]).optional(),
+          name: z.string().optional(),
+          steps: z.array(funnelStepShape).optional(),
+        })
+        .passthrough()
+    )
+    .describe("Saved funnels"),
+};
+
+const analyzeFunnelOutput = {
+  steps: z
+    .array(
+      z
+        .object({
+          name: z.string().optional(),
+          count: z.number().optional(),
+          dropoff: z.number().optional(),
+          dropoffRate: z.number().optional(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Per-step counts and dropoffs"),
+};
+
+const funnelStepSessionsOutput = {
+  data: z.array(z.record(z.unknown())).optional().describe("Sessions for the step"),
+};
+
+const createFunnelOutput = {
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  steps: z.array(funnelStepShape).optional(),
+};
+
+const deleteFunnelOutput = {
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+};
+
 export function registerFunnelsTools(
   server: McpServer,
   client: RybbitClient
@@ -40,11 +94,16 @@ export function registerFunnelsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
         siteId: siteIdSchema,
+      },
+      outputSchema: listFunnelsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Listing funnels…",
+        "openai/toolInvocation/invoked": "Funnels loaded",
       },
     },
     async (args) => {
@@ -54,7 +113,9 @@ export function registerFunnelsTools(
         const data = await client.get<FunnelDefinition[]>(
           `/sites/${siteId}/funnels`
         );
+        const wrapped = { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -76,7 +137,7 @@ export function registerFunnelsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -119,6 +180,11 @@ export function registerFunnelsTools(
           .min(2)
           .describe("Funnel steps to analyze (minimum 2)"),
       },
+      outputSchema: analyzeFunnelOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Analyzing funnel…",
+        "openai/toolInvocation/invoked": "Funnel analyzed",
+      },
     },
     async (args) => {
       try {
@@ -145,6 +211,7 @@ export function registerFunnelsTools(
           params
         );
         return {
+          structuredContent: data as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -166,7 +233,7 @@ export function registerFunnelsTools(
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -218,6 +285,11 @@ export function registerFunnelsTools(
           .describe("The funnel steps definition (same as used in rybbit_analyze_funnel)"),
         ...paginationSchema,
       },
+      outputSchema: funnelStepSessionsOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Loading step sessions…",
+        "openai/toolInvocation/invoked": "Sessions loaded",
+      },
     },
     async (args) => {
       try {
@@ -248,7 +320,9 @@ export function registerFunnelsTools(
           { steps },
           params
         );
+        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -270,7 +344,7 @@ export function registerFunnelsTools(
       annotations: {
         readOnlyHint: false,
         idempotentHint: false,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: false,
       },
       inputSchema: {
@@ -293,6 +367,11 @@ export function registerFunnelsTools(
           .optional()
           .describe("Optional existing funnel report ID to overwrite (instead of creating a new one)"),
       },
+      outputSchema: createFunnelOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Saving funnel…",
+        "openai/toolInvocation/invoked": "Funnel saved",
+      },
     },
     async (args) => {
       try {
@@ -304,7 +383,11 @@ export function registerFunnelsTools(
         };
 
         const data = await client.post(`/sites/${siteId}/funnels`, body);
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { data };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
@@ -325,7 +408,7 @@ export function registerFunnelsTools(
       annotations: {
         readOnlyHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
         destructiveHint: true,
       },
       inputSchema: {
@@ -334,12 +417,21 @@ export function registerFunnelsTools(
           .union([z.string(), z.number()])
           .describe("Funnel ID to delete (from rybbit_list_funnels)"),
       },
+      outputSchema: deleteFunnelOutput,
+      _meta: {
+        "openai/toolInvocation/invoking": "Deleting funnel…",
+        "openai/toolInvocation/invoked": "Funnel deleted",
+      },
     },
     async (args) => {
       try {
         const { siteId, funnelId } = args as { siteId: string; funnelId: string | number };
         const data = await client.delete(`/sites/${siteId}/funnels/${funnelId}`);
+        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
+          ? (data as Record<string, unknown>)
+          : { success: true };
         return {
+          structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
         };
       } catch (err) {
