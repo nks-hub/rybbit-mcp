@@ -1,16 +1,25 @@
 {
   "name": "@nks-hub/rybbit-mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "MCP server for Rybbit Analytics - query statistics, errors, users, sessions, funnels, goals, and performance metrics via Claude Code",
   "type": "module",
-  "main": "build/index.js",
+  "main": "build/server.js",
+  "types": "build/server.d.ts",
   "bin": {
     "rybbit-mcp": "./build/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./build/server.d.ts",
+      "import": "./build/server.js"
+    },
+    "./cli": "./build/index.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node build/index.js"
+    "start": "node build/index.js",
+    "start:http": "cross-env MCP_TRANSPORT=http node build/index.js"
   },
   "keywords": [
     "mcp",
