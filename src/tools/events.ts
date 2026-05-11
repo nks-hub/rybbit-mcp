@@ -277,7 +277,20 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const maxScan = args.maxScan ?? 5000;
         const topN = args.topN ?? 50;
         const pageSize = 200;
-        const baseParams = client.buildAnalyticsParams(args) as Record<string, unknown>;
+        // Pre-narrow at the upstream by injecting an event_name filter when
+        // requested. The backend's filter array is session-scoped (returns
+        // ALL events from sessions containing a match) — not perfect, but
+        // dramatically reduces the scan compared to no filter at all.
+        const argsWithFilter = args.eventName
+          ? {
+              ...args,
+              filters: [
+                ...(args.filters ?? []),
+                { parameter: "event_name", type: "equals", value: [args.eventName] },
+              ],
+            }
+          : args;
+        const baseParams = client.buildAnalyticsParams(argsWithFilter) as Record<string, unknown>;
 
         const seen: EventRow[] = [];
         let cursor: string | undefined;
