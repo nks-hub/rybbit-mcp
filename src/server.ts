@@ -21,9 +21,10 @@ import { registerPerformanceTools } from "./tools/performance.js";
 import { registerFunnelsTools } from "./tools/funnels.js";
 import { registerGoalsTools } from "./tools/goals.js";
 import { registerJourneysTools } from "./tools/journeys.js";
+import { registerDescribeTools } from "./tools/describe.js";
 
 export const RYBBIT_SERVER_NAME = "rybbit-mcp";
-export const RYBBIT_SERVER_VERSION = "0.7.2";
+export const RYBBIT_SERVER_VERSION = "0.7.3";
 
 export const RYBBIT_INSTRUCTIONS =
   "Rybbit Analytics MCP server. Start with rybbit_list_sites to discover available sites and their IDs. " +
@@ -51,6 +52,7 @@ export function createRybbitServer(config: AuthConfig): McpServer {
   registerFunnelsTools(server, client);
   registerGoalsTools(server, client);
   registerJourneysTools(server, client);
+  registerDescribeTools(server);
 
   return server;
 }

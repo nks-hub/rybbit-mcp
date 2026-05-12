@@ -169,7 +169,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       title: "List Users",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "List users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. Supports filtering by any analytics dimension. Use 'search' param to find users by username/email/name (case-insensitive partial match).",
+        "List users for a site. Returns user IDs, session counts, first/last seen dates, and user traits. " +
+        "Supports filtering by most analytics dimensions. Use 'search' param to find users by username/email/name (case-insensitive partial match). " +
+        "IMPORTANT: `event_name` filter is silently STRIPPED here — upstream backend returns HTTP 500. " +
+        "To rank users by a specific event, use `rybbit_get_event_user_leaderboard` instead. " +
+        "Call `rybbit_describe_dimension` to see capability per filter dimension.",
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
