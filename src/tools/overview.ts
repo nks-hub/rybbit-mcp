@@ -19,8 +19,12 @@ interface TimeseriesDataPoint {
 }
 
 // Output schemas
+// Backend returns `{ count: 117 }`. The MCP wrapper previously assumed a bare
+// number — when the upstream changed shape, output validation rejected the
+// result. We now normalize to `{ liveUsers: <number> }` regardless of upstream
+// shape and accept either bare number or `{ count }`.
 const liveUsersOutput = {
-  liveUsers: z.number().describe("Current live/active user count"),
+  liveUsers: z.number().describe("Current live/active user count (normalized from upstream {count} envelope)"),
 };
 
 const overviewOutput = {
@@ -88,9 +92,21 @@ export function registerOverviewTools(
     },
     async (args) => {
       try {
-        const count = await client.get<number>(
+        // Backend returns either a bare number (old) or `{ count: N }` (new).
+        // Normalize to a number so structuredContent matches outputSchema.
+        const raw = await client.get<unknown>(
           `/sites/${args.siteId}/live-user-count`
         );
+        let count = 0;
+        if (typeof raw === "number") {
+          count = raw;
+        } else if (raw && typeof raw === "object" && "count" in raw) {
+          const c = (raw as { count: unknown }).count;
+          count = typeof c === "number" ? c : Number(c) || 0;
+        } else if (raw && typeof raw === "object" && "liveUsers" in raw) {
+          const c = (raw as { liveUsers: unknown }).liveUsers;
+          count = typeof c === "number" ? c : Number(c) || 0;
+        }
 
         const result = { liveUsers: count };
 

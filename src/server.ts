@@ -24,7 +24,7 @@ import { registerJourneysTools } from "./tools/journeys.js";
 import { registerDescribeTools } from "./tools/describe.js";
 
 export const RYBBIT_SERVER_NAME = "rybbit-mcp";
-export const RYBBIT_SERVER_VERSION = "0.7.3";
+export const RYBBIT_SERVER_VERSION = "0.7.4";
 
 export const RYBBIT_INSTRUCTIONS =
   "Rybbit Analytics MCP server. Start with rybbit_list_sites to discover available sites and their IDs. " +
