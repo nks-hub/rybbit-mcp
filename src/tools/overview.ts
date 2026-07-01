@@ -220,7 +220,7 @@ export function registerOverviewTools(
         });
 
         const data = await client.get<TimeseriesDataPoint[]>(
-          `/sites/${args.siteId}/overview-bucketed`,
+          `/sites/${args.siteId}/overview/time-series`,
           params
         );
 
@@ -272,7 +272,7 @@ export function registerOverviewTools(
         const params = client.buildAnalyticsParams(args);
 
         const data = await client.get(
-          `/sites/${args.siteId}/session-locations`,
+          `/sites/${args.siteId}/sessions/locations`,
           params
         );
 

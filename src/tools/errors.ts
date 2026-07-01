@@ -111,7 +111,7 @@ export function registerErrorsTools(
           }
           params.errorMessage = errorMessage;
           const data = await client.get<unknown[]>(
-            `/sites/${siteId}/error-bucketed`,
+            `/sites/${siteId}/errors/time-series`,
             params
           );
           const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
@@ -130,7 +130,7 @@ export function registerErrorsTools(
           }
           params.errorMessage = errorMessage;
           const data = await client.get<ErrorEvent[]>(
-            `/sites/${siteId}/error-events`,
+            `/sites/${siteId}/errors/events`,
             params
           );
           const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
@@ -141,7 +141,7 @@ export function registerErrorsTools(
         }
 
         const data = await client.get<ErrorName[]>(
-          `/sites/${siteId}/error-names`,
+          `/sites/${siteId}/errors/names`,
           params
         );
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);

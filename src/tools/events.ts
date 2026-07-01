@@ -663,7 +663,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     async (args) => {
       try {
         const params = client.buildAnalyticsParams(args);
-        const data = await client.get(`/sites/${args.siteId}/events/bucketed`, params);
+        const data = await client.get(`/sites/${args.siteId}/events/time-series`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
