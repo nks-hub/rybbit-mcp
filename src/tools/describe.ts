@@ -7,8 +7,8 @@
  *     `get_overview*`, `funnels`, but CRASHES the backend's `getUsers`
  *     endpoint, so `list_users` strips it.
  *   - `user_id` matches BOTH the device hash and identified_user_id.
- *   - `app_version`/`device_model` are populated only for app-type sites
- *     (tracked via SDK), not browser pageview sites.
+ *   - `app_version`/`device_model` are populated only for mobile-type sites
+ *     (legacy: app; tracked via SDK), not browser pageview sites.
  *
  * Without this tool, models have to discover these gotchas by trial &
  * error. This tool is the source of truth: given a dimension name it
@@ -139,15 +139,15 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
     },
     app_version: {
         parameter: "app_version",
-        description: "Application version string. Populated only for app-type sites tracked via SDK (not browser pageview sites).",
+        description: "Application version string. Populated only for mobile-type sites (legacy: app) tracked via SDK (not browser pageview sites).",
         supportedIn: ["all analytics endpoints (limited utility for web sites)"],
         strippedIn: [],
-        valueHint: "Empty string for browser sites. Free-form for app sites.",
+        valueHint: "Empty string for browser sites. Free-form for mobile/app sites.",
         examples: ["1.2.3", "(empty)"],
     },
     device_model: {
         parameter: "device_model",
-        description: "Mobile device model name. Populated only for app-type sites tracked via SDK.",
+        description: "Mobile device model name. Populated only for mobile-type sites (legacy: app) tracked via SDK.",
         supportedIn: ["all analytics endpoints (limited utility for web sites)"],
         strippedIn: [],
         valueHint: "Empty string for browser sites.",

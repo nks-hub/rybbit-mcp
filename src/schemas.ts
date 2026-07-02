@@ -10,8 +10,19 @@ export const siteIdSchema = z
   .describe("Site ID (numeric ID or domain identifier)");
 
 /**
- * Full list of filter dimensions supported by Rybbit's getFilterStatement.
- * Sourced from `shared/src/filters.ts` (FilterParameter union type).
+ * Filter dimensions accepted by Rybbit's runtime filter validation.
+ *
+ * Sourced from the server's enforced schema `baseFilterParamSchema` in
+ * `server/src/api/analytics/utils/query-validation.ts` — the schema actually
+ * validated by `getFilterStatement` (via `validateFilters`) and by `getMetric`
+ * (via `getSqlParam` → `filterParamSchema.parse`). Anything outside it is
+ * rejected with an HTTP 500 on the general analytics endpoints.
+ *
+ * NOTE: the wider `FilterParameter` union in `shared/src/filters.ts` also lists
+ * bot/enrichment dims (vpn, crawler, datacenter, company*, asn*), but those are
+ * NOT runtime-accepted on general endpoints — they are only served by the
+ * dedicated `/bots` dimension endpoint (its own BOT_DIMENSIONS set), which this
+ * MCP does not wrap. They are intentionally omitted here.
  */
 const FILTER_DIMENSIONS = [
   "browser",
@@ -44,15 +55,6 @@ const FILTER_DIMENSIONS = [
   "lat",
   "lon",
   "timezone",
-  "vpn",
-  "crawler",
-  "datacenter",
-  "company",
-  "company_type",
-  "company_domain",
-  "asn_org",
-  "asn_type",
-  "asn_domain",
   "tag",
 ] as const;
 
@@ -63,7 +65,7 @@ export const filterSchema = z.object({
       `Filter dimension. One of: ${FILTER_DIMENSIONS.join(", ")}. ` +
         `Custom URL parameters use the prefix 'url_param:NAME' (e.g., 'url_param:campaign_id'). ` +
         `Note: user_id filter checks BOTH the device hash (user_id) and app-provided ID (identified_user_id). ` +
-        `device_model and app_version are populated only for app-type sites tracked via SDK.`
+        `device_model and app_version are populated only for mobile-type sites (legacy: app) tracked via SDK.`
     ),
   type: z
     .enum([
@@ -165,11 +167,7 @@ export const metricParameterSchema = z
     "entry_page",
     "exit_page",
     "timezone",
-    "company",
-    "company_type",
-    "asn_org",
-    "asn_type",
   ])
   .describe(
-    "Metric dimension to break down by. device_model and app_version apply only to app-type sites tracked via SDK."
+    "Metric dimension to break down by. device_model and app_version apply only to mobile-type sites (legacy: app) tracked via SDK."
   );
