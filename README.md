@@ -119,7 +119,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_get_config` | Get server version and configuration |
 | `rybbit_list_sites` | List all sites and organizations |
-| `rybbit_create_site` | Create a new site (type: `web` or `app` — app sites auto-disable bot filtering) |
+| `rybbit_create_site` | Create a new site (type: `web` or `mobile`; legacy alias `app` maps to `mobile` — mobile sites auto-disable bot filtering) |
 | `rybbit_delete_site` | Delete a site permanently |
 | `rybbit_get_site_id` | Look up site ID by domain name |
 | `rybbit_update_site_config` | Update site tracking config (IP, errors, replay, etc.) |

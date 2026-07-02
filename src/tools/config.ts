@@ -208,11 +208,11 @@ export function registerConfigTools(
     {
       title: "Create Site",
       description:
-        "Create a new site in Rybbit. Use type 'web' for websites (domain like 'example.com') or type 'app' for mobile apps (package name like 'com.example.app'). Returns the created site with its siteId for tracking integration.",
+        "Create a new site in Rybbit. Use type 'web' for websites (domain like 'example.com') or type 'mobile' for mobile apps (package name like 'com.example.app'). 'app' is accepted as a legacy alias for 'mobile'. Returns the created site with its siteId for tracking integration.",
       inputSchema: {
         domain: z
           .string()
-          .describe("Domain of the site (e.g. 'example.com') or package name for apps (e.g. 'com.example.app')"),
+          .describe("Domain of the site (e.g. 'example.com') or package name for mobile apps (e.g. 'com.example.app')"),
         name: z
           .string()
           .optional()
@@ -223,9 +223,9 @@ export function registerConfigTools(
             "Organization ID to add the site to. Use rybbit_list_sites to find organization IDs."
           ),
         type: z
-          .enum(["web", "app"])
+          .enum(["web", "mobile", "app"])
           .optional()
-          .describe("Site type: 'web' for websites (default), 'app' for mobile apps"),
+          .describe("Site type: 'web' for websites (default), 'mobile' for mobile apps. 'app' is a legacy alias mapped to 'mobile'."),
       },
       outputSchema: createSiteOutput,
       _meta: {
@@ -241,20 +241,23 @@ export function registerConfigTools(
     },
     async ({ domain, name, organizationId, type }) => {
       try {
-        const isApp = type === "app";
+        // 'app' is a legacy alias for the canonical 'mobile' site type (Rybbit v2.6 API).
+        // The server maps only type === "mobile" to a mobile site; anything else becomes web.
+        const isMobile = type === "mobile" || type === "app";
+        const resolvedType = isMobile ? "mobile" : type === "web" ? "web" : undefined;
         const data = await client.post<Site>(
           `/organizations/${organizationId}/sites`,
           {
             domain,
             name: name || domain,
-            ...(type ? { type } : {}),
-            // App sites must have blockBots disabled - Dart/Flutter HTTP UA is detected as bot
-            ...(isApp ? { blockBots: false } : {}),
+            ...(resolvedType ? { type: resolvedType } : {}),
+            // Mobile sites must have blockBots disabled - Dart/Flutter HTTP UA is detected as bot
+            ...(isMobile ? { blockBots: false } : {}),
           }
         );
 
-        // For app sites, ensure blockBots is disabled via config update
-        if (isApp && data.id) {
+        // For mobile sites, ensure blockBots is disabled via config update
+        if (isMobile && data.id) {
           try {
             await client.put(`/sites/${data.id}/config`, { blockBots: false });
           } catch {
@@ -263,7 +266,7 @@ export function registerConfigTools(
         }
 
         const result = {
-          message: `Site '${data.domain}' created successfully${isApp ? " (blockBots disabled for app site)" : ""}`,
+          message: `Site '${data.domain}' created successfully${isMobile ? " (blockBots disabled for mobile site)" : ""}`,
           siteId: data.id,
           domain: data.domain,
           name: data.name,
@@ -379,7 +382,7 @@ export function registerConfigTools(
     {
       title: "Update Site Config",
       description:
-        "Update configuration for an existing Rybbit site. Toggle tracking features like IP tracking, session replay, error tracking, button clicks, etc.",
+        "Update configuration for an existing Rybbit site. Change site identity (name, domain, type), toggle tracking features (IP, session replay, errors, button clicks, etc.), manage exclusions (IPs, countries, paths, hostnames, user agents), and public embedding.",
       inputSchema: {
         siteId: siteIdSchema,
         // Site identity
@@ -394,9 +397,14 @@ export function registerConfigTools(
           .min(1)
           .max(253)
           .optional()
-          .describe("Domain (web sites) or package name (app sites). Normalized server-side."),
+          .describe("Domain (web sites) or package name (mobile sites). Normalized server-side."),
+        type: z
+          .enum(["web", "mobile", "app"])
+          .optional()
+          .describe("Site type: 'web' or 'mobile'. 'app' is a legacy alias mapped to 'mobile'. Switching to mobile forces sessionReplay and webVitals off."),
         // Privacy & filtering
         public: z.boolean().optional().describe("Make site stats publicly accessible"),
+        embedEnabled: z.boolean().optional().describe("Allow embedding public stats (e.g. via iframe)"),
         saltUserIds: z.boolean().optional().describe("Salt user IDs for privacy"),
         blockBots: z.boolean().optional().describe("Block known bots from tracking"),
         excludedIPs: z
@@ -414,6 +422,21 @@ export function registerConfigTools(
           .max(250)
           .optional()
           .describe("ISO 3166-1 alpha-2 country codes to exclude from tracking (max 250)"),
+        excludedPaths: z
+          .array(z.string().min(1).max(2048))
+          .max(100)
+          .optional()
+          .describe("URL path patterns to exclude from tracking (max 100)"),
+        excludedHostnames: z
+          .array(z.string().min(1).max(253))
+          .max(100)
+          .optional()
+          .describe("Hostnames to exclude from tracking (max 100)"),
+        excludedUserAgents: z
+          .array(z.string().min(1).max(512))
+          .max(100)
+          .optional()
+          .describe("User-agent substrings/patterns to exclude from tracking (max 100)"),
         tags: z
           .array(z.string().min(1).max(50))
           .max(20)
@@ -452,6 +475,11 @@ export function registerConfigTools(
           if (value !== undefined) {
             body[key] = value;
           }
+        }
+
+        // 'app' is a legacy alias for the canonical 'mobile' site type (Rybbit v2.6 API).
+        if (body.type === "app") {
+          body.type = "mobile";
         }
 
         if (Object.keys(body).length === 0) {

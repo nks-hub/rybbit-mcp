@@ -113,10 +113,10 @@ Create a new site in Rybbit.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `domain` | string | Yes | Domain (e.g., `example.com`) or package name for apps (e.g., `com.example.app`) |
+| `domain` | string | Yes | Domain (e.g., `example.com`) or package name for mobile apps (e.g., `com.example.app`) |
 | `name` | string | No | Display name (defaults to domain) |
 | `organizationId` | string | Yes | Organization ID (from `rybbit_list_sites`) |
-| `type` | `"web"` \| `"app"` | No | Site type. Default: `web`. `app` auto-disables blockBots. |
+| `type` | `"web"` \| `"mobile"` \| `"app"` | No | Site type. Default: `web`. `mobile` is canonical; `app` is a legacy alias mapped to `mobile`. Mobile sites auto-disable blockBots. |
 
 **Returns**: `{ message, siteId, domain, name, organizationId }`
 
@@ -1004,7 +1004,7 @@ For timeseries endpoints, the `bucket` parameter controls granularity:
 
 7. **`rybbit_get_user_traits` mode="users" resolves case** — the API does exact case-sensitive matching, but the tool first resolves the correct case by looking up values, so you can pass `value="john"` even if the stored value is `John`.
 
-8. **App sites auto-disable blockBots** — when creating a site with `type="app"`, `blockBots` is automatically disabled because Flutter/Dart HTTP user agents are detected as bots.
+8. **Mobile sites auto-disable blockBots** — when creating a site with `type="mobile"` (or the legacy alias `type="app"`), `blockBots` is automatically disabled because Flutter/Dart HTTP user agents are detected as bots.
 
 ### Constants
 - `CHARACTER_LIMIT`: 25,000 chars
