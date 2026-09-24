@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
 import { analyticsInputSchema, bucketSchema } from "../schemas.js";
 
 interface PerformanceOverview {
@@ -47,26 +47,26 @@ const dimensionSchema = z
 // Output schemas
 const performanceOutput = {
   // Overview percentiles (when dimension=overview or unset)
-  lcp_p50: z.number().optional(),
-  lcp_p75: z.number().optional(),
-  lcp_p90: z.number().optional(),
-  lcp_p99: z.number().optional(),
-  cls_p50: z.number().optional(),
-  cls_p75: z.number().optional(),
-  cls_p90: z.number().optional(),
-  cls_p99: z.number().optional(),
-  inp_p50: z.number().optional(),
-  inp_p75: z.number().optional(),
-  inp_p90: z.number().optional(),
-  inp_p99: z.number().optional(),
-  fcp_p50: z.number().optional(),
-  fcp_p75: z.number().optional(),
-  fcp_p90: z.number().optional(),
-  fcp_p99: z.number().optional(),
-  ttfb_p50: z.number().optional(),
-  ttfb_p75: z.number().optional(),
-  ttfb_p90: z.number().optional(),
-  ttfb_p99: z.number().optional(),
+  lcp_p50: z.number().nullable().optional(),
+  lcp_p75: z.number().nullable().optional(),
+  lcp_p90: z.number().nullable().optional(),
+  lcp_p99: z.number().nullable().optional(),
+  cls_p50: z.number().nullable().optional(),
+  cls_p75: z.number().nullable().optional(),
+  cls_p90: z.number().nullable().optional(),
+  cls_p99: z.number().nullable().optional(),
+  inp_p50: z.number().nullable().optional(),
+  inp_p75: z.number().nullable().optional(),
+  inp_p90: z.number().nullable().optional(),
+  inp_p99: z.number().nullable().optional(),
+  fcp_p50: z.number().nullable().optional(),
+  fcp_p75: z.number().nullable().optional(),
+  fcp_p90: z.number().nullable().optional(),
+  fcp_p99: z.number().nullable().optional(),
+  ttfb_p50: z.number().nullable().optional(),
+  ttfb_p75: z.number().nullable().optional(),
+  ttfb_p90: z.number().nullable().optional(),
+  ttfb_p99: z.number().nullable().optional(),
   // Dimension breakdown rows (when dimension=pathname/browser/operating_system)
   data: z
     .array(
@@ -78,6 +78,7 @@ const performanceOutput = {
     )
     .optional()
     .describe("Per-dimension rows when dimension!=overview"),
+  totalCount: z.number().optional().describe("Total rows across all pages"),
 };
 
 const performanceTimeseriesOutput = {
@@ -147,17 +148,20 @@ export function registerPerformanceTools(
             `/sites/${siteId}/performance/by-dimension`,
             params
           );
-          const wrapped = { data };
+          const { rows, totalCount } = unwrapRows(data);
+          const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
           return {
             structuredContent: wrapped as unknown as Record<string, unknown>,
-            content: [{ type: "text" as const, text: truncateResponse(data) }],
+            content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
           };
         }
 
-        const data = await client.get<PerformanceOverview>(
+        const raw = await client.get<{ data?: PerformanceOverview }>(
           `/sites/${siteId}/performance/overview`,
           params
         );
+        // v2.6 nests the percentiles under `data`; null means no samples in range
+        const data = raw?.data ?? raw;
         return {
           structuredContent: data as unknown as Record<string, unknown>,
           content: [{ type: "text" as const, text: truncateResponse(data) }],
@@ -217,10 +221,11 @@ export function registerPerformanceTools(
           `/sites/${siteId}/performance/time-series`,
           params
         );
-        const wrapped = { data };
+        const { rows, totalCount } = unwrapRows(data);
+        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
+          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

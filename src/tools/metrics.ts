@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
 import {
   analyticsInputSchema,
   metricParameterSchema,
@@ -13,12 +13,6 @@ interface MetricEntry {
   percentage: number;
   bounceRate?: number;
   timeOnPage?: number;
-  [key: string]: unknown;
-}
-
-interface RetentionData {
-  cohort: string;
-  periods: number[];
   [key: string]: unknown;
 }
 
@@ -37,6 +31,7 @@ const metricOutput = {
         .passthrough()
     )
     .describe("Metric breakdown rows"),
+  totalCount: z.number().optional().describe("Total rows across all pages"),
 };
 
 const retentionOutput = {
@@ -45,11 +40,13 @@ const retentionOutput = {
       z
         .object({
           cohort: z.string().optional(),
-          periods: z.array(z.number()).optional(),
+          size: z.number().optional(),
+          periods: z.array(z.number().nullable()).optional(),
         })
         .passthrough()
     )
-    .describe("Retention cohorts"),
+    .describe("Retention cohorts; periods are percentages per period, null = period not reached yet"),
+  mode: z.unknown().optional(),
 };
 
 export function registerMetricsTools(
@@ -102,14 +99,15 @@ export function registerMetricsTools(
           params
         );
 
-        const wrapped = { data };
+        const { rows, totalCount } = unwrapRows(data);
+        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
 
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse(data),
+              text: truncateResponse(wrapped),
             },
           ],
         };
@@ -158,19 +156,33 @@ export function registerMetricsTools(
 
         const params = client.buildAnalyticsParams(rest);
 
-        const data = await client.get<RetentionData[]>(
+        const data = await client.get<unknown>(
           `/sites/${siteId}/retention`,
           params
         );
 
-        const wrapped = { data };
+        // v2.6 returns { data: { cohorts: { "<date>": { size, percentages } }, mode, ... } }
+        const payload = (data as { data?: Record<string, unknown> })?.data;
+        const cohorts = payload?.cohorts as
+          | Record<string, { size?: number; percentages?: (number | null)[] }>
+          | undefined;
+        const wrapped = cohorts
+          ? {
+              data: Object.entries(cohorts).map(([cohort, c]) => ({
+                cohort,
+                size: c.size,
+                periods: c.percentages ?? [],
+              })),
+              mode: payload?.mode,
+            }
+          : { data: unwrapRows(data).rows };
 
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse(data),
+              text: truncateResponse(wrapped),
             },
           ],
         };

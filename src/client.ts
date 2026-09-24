@@ -179,3 +179,29 @@ export function truncateResponse(data: unknown): string {
   return json.slice(0, CHARACTER_LIMIT) +
     `\n\n[Response truncated at ${CHARACTER_LIMIT} characters. Use filters or pagination to reduce data.]`;
 }
+
+/**
+ * Extracts the row array from a Rybbit list response. The server is not consistent:
+ * some endpoints return a bare array, most return { data: [...] }, paginated ones
+ * (metric, performance/by-dimension) nest it as { data: { data: [...], totalCount } }
+ * and journeys uses { journeys: [...] }. Tools declare `data: array` in their output
+ * schema, so wrapping any of these once more fails the SDK's structuredContent check.
+ */
+export function unwrapRows(raw: unknown): {
+  rows: Record<string, unknown>[];
+  totalCount?: number;
+} {
+  let value: unknown = raw;
+  let totalCount: number | undefined;
+  for (let depth = 0; depth < 3; depth++) {
+    if (Array.isArray(value)) break;
+    if (!value || typeof value !== "object") break;
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.totalCount === "number") totalCount = obj.totalCount;
+    value = obj.data ?? obj.journeys;
+  }
+  return {
+    rows: Array.isArray(value) ? (value as Record<string, unknown>[]) : [],
+    totalCount,
+  };
+}

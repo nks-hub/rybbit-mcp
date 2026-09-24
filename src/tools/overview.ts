@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface OverviewMetrics {
@@ -224,14 +224,15 @@ export function registerOverviewTools(
           params
         );
 
-        const wrapped = { data };
+        const { rows, totalCount } = unwrapRows(data);
+        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
 
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
           content: [
             {
               type: "text" as const,
-              text: truncateResponse(data),
+              text: truncateResponse(wrapped),
             },
           ],
         };

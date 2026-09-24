@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
 import { analyticsInputSchema, filterSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface FunnelStep {
@@ -113,10 +113,11 @@ export function registerFunnelsTools(
         const data = await client.get<FunnelDefinition[]>(
           `/sites/${siteId}/funnels`
         );
-        const wrapped = { data };
+        const { rows, totalCount } = unwrapRows(data);
+        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
         return {
           structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
+          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
