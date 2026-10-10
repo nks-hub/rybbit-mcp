@@ -7,18 +7,18 @@
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.27+-8b5cf6.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit) — query statistics, errors, users, sessions, funnels, goals, and performance metrics directly from Claude Code or any MCP-compatible client.
+> MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit). Claude Code and other MCP clients use it to query statistics, errors, users, sessions, funnels, goals and performance metrics.
 
 ## Features
 
-- 🧰 **32 Analytics Tools** - Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management
-- 🔐 **Flexible Auth** - API key (recommended) or email/password authentication
-- 🔍 **Smart Filtering** - Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
-- 📅 **Time Ranges** - Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`)
-- 📈 **Time Series** - Configurable bucket granularity from minutes to years
-- 📄 **Pagination** - Built-in page/limit support for large datasets
-- ✂️ **Response Truncation** - Auto-truncation at 25k chars to prevent context bloat
-- 💡 **Actionable Errors** - Error messages guide the LLM toward correct tool usage
+- 🧰 **32 analytics tools** - Overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys and site management
+- 🔐 **Authentication** - API key (recommended) or email and password
+- 🔍 **Filtering** - Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
+- 📅 **Time ranges** - Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`)
+- 📈 **Time series** - Bucket size from one minute to one year
+- 📄 **Pagination** - `page` and `limit` parameters for large result sets
+- ✂️ **Response truncation** - Cuts responses at 25k characters so they fit the model context
+- 💡 **Error messages** - Tell the model what to try next, e.g. narrow the date range or call `rybbit_list_sites` for valid IDs
 
 ## Requirements
 
@@ -29,7 +29,7 @@
 
 ### npx (recommended)
 
-No install needed. Just configure your MCP client to run via `npx`:
+Configure your MCP client to run the package via `npx`:
 
 ```json
 {
@@ -83,9 +83,7 @@ Then point your MCP config to the local build:
 
 ## Usage
 
-Ask Claude Code anything about your analytics data. The MCP tools are automatically available.
-
-Instead of manually checking the Rybbit dashboard, let your AI assistant query analytics data directly:
+Once the server is configured, Claude Code can answer questions such as:
 
 - "How many users visited the site today?"
 - "Show me the top pages by bounce rate this week"
@@ -95,28 +93,26 @@ Instead of manually checking the Rybbit dashboard, let your AI assistant query a
 
 ## Authentication
 
-Supports two authentication methods:
-
 | Method | Environment Variables | Use Case |
 |--------|----------------------|----------|
-| **API Key** | `RYBBIT_API_KEY` | Recommended for production |
-| **Email/Password** | `RYBBIT_EMAIL`, `RYBBIT_PASSWORD` | Development/testing |
+| **API key** | `RYBBIT_API_KEY` | Recommended for production |
+| **Email/password** | `RYBBIT_EMAIL`, `RYBBIT_PASSWORD` | Development/testing |
 
 Both require `RYBBIT_URL` pointing to your Rybbit instance.
 
 ## Tools (32)
 
-### Configuration & Site Management
+### Configuration and site management
 | Tool | Description |
 |------|-------------|
 | `rybbit_get_config` | Get server version and configuration |
 | `rybbit_list_sites` | List all sites and organizations |
-| `rybbit_create_site` | Create a new site (type: `web` or `mobile`; legacy alias `app` maps to `mobile` — mobile sites auto-disable bot filtering) |
+| `rybbit_create_site` | Create a new site (type: `web` or `mobile`; legacy alias `app` maps to `mobile`; mobile sites have bot filtering turned off) |
 | `rybbit_delete_site` | Delete a site permanently |
 | `rybbit_get_site_id` | Look up site ID by domain name |
 | `rybbit_update_site_config` | Update site tracking config (IP, errors, replay, etc.) |
 
-### Real-time & Overview
+### Real-time and overview
 | Tool | Description |
 |------|-------------|
 | `rybbit_live_users` | Current active users count |
@@ -124,7 +120,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_get_overview_timeseries` | Metrics as time-series with configurable buckets |
 | `rybbit_get_session_locations` | Geographic session data with coordinates for map visualization |
 
-### Metrics & Dimensions
+### Metrics and dimensions
 | Tool | Description |
 |------|-------------|
 | `rybbit_get_metric` | Breakdown by dimension (browser, OS, country, page, UTM, etc.) |
@@ -164,7 +160,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_get_performance` | Core Web Vitals (LCP, CLS, INP, FCP, TTFB) with percentiles |
 | `rybbit_get_performance_timeseries` | Web Vitals trends over time |
 
-### Funnels & Goals
+### Funnels and goals
 | Tool | Description |
 |------|-------------|
 | `rybbit_list_funnels` | Saved funnels with step definitions |
@@ -178,7 +174,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_get_journeys` | User navigation path analysis |
 
-## Common Parameters
+## Common parameters
 
 All analytics tools support these optional parameters:
 
@@ -191,24 +187,24 @@ All analytics tools support these optional parameters:
 | `filters` | array | Filter array `[{parameter, type, value[]}]` |
 | `pastMinutesStart` | number | Minutes ago (alternative to date range) |
 
-### Filter Parameters
+### Filter parameters
 
 `browser`, `operating_system`, `language`, `country`, `region`, `city`, `device_type`, `referrer`, `hostname`, `pathname`, `page_title`, `querystring`, `event_name`, `channel`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `entry_page`, `exit_page`, `user_id`
 
-### Filter Types
+### Filter types
 
 `equals`, `not_equals`, `contains`, `not_contains`, `regex`, `not_regex`, `greater_than`, `less_than`
 
-### Time Buckets
+### Time buckets
 
 `minute`, `five_minutes`, `ten_minutes`, `fifteen_minutes`, `hour`, `day`, `week`, `month`, `year`
 
-## Related Projects
+## Related projects
 
 - [Rybbit Analytics](https://github.com/rybbit-io/rybbit)
-- [npm Package](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
-- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) — TypeScript tracking SDK
-- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk) — Flutter/Dart tracking SDK
+- [npm package](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
+- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts): TypeScript tracking SDK
+- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk): Flutter/Dart tracking SDK
 
 ## Development
 
