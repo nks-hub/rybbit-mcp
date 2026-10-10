@@ -2,29 +2,32 @@
 
 [![Build Status](https://github.com/nks-hub/rybbit-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/nks-hub/rybbit-mcp/actions)
 [![npm version](https://img.shields.io/npm/v/@nks-hub/rybbit-mcp.svg)](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178c6.svg)](https://www.typescriptlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.27+-8b5cf6.svg)](https://modelcontextprotocol.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > MCP server for [Rybbit Analytics](https://github.com/rybbit-io/rybbit) — query statistics, errors, users, sessions, funnels, goals, and performance metrics directly from Claude Code or any MCP-compatible client.
 
----
+## Features
 
-## Why?
+- 🧰 **32 Analytics Tools** - Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management
+- 🔐 **Flexible Auth** - API key (recommended) or email/password authentication
+- 🔍 **Smart Filtering** - Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
+- 📅 **Time Ranges** - Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`)
+- 📈 **Time Series** - Configurable bucket granularity from minutes to years
+- 📄 **Pagination** - Built-in page/limit support for large datasets
+- ✂️ **Response Truncation** - Auto-truncation at 25k chars to prevent context bloat
+- 💡 **Actionable Errors** - Error messages guide the LLM toward correct tool usage
 
-Instead of manually checking the Rybbit dashboard, let your AI assistant query analytics data directly:
+## Requirements
 
-- "How many users visited the site today?"
-- "Show me the top pages by bounce rate this week"
-- "What errors occurred in the last hour?"
-- "Show user journey from homepage to checkout"
-- "Compare browser usage between mobile and desktop"
+- **Node.js**: 18+
+- **Rybbit Analytics**: Self-hosted or cloud instance
 
----
+## Installation
 
-## Quick Start
-
-### Installation (npx — recommended)
+### npx (recommended)
 
 No install needed. Just configure your MCP client to run via `npx`:
 
@@ -51,7 +54,7 @@ Add this to your `~/.claude/settings.json` or project `.claude/settings.json`.
 claude mcp add rybbit -e RYBBIT_URL=https://your-instance.com -e RYBBIT_API_KEY=your-key -- npx -y @nks-hub/rybbit-mcp
 ```
 
-### Installation (from source)
+### From source
 
 For development or contributing:
 
@@ -78,26 +81,17 @@ Then point your MCP config to the local build:
 }
 ```
 
-### Usage
+## Usage
 
 Ask Claude Code anything about your analytics data. The MCP tools are automatically available.
 
----
+Instead of manually checking the Rybbit dashboard, let your AI assistant query analytics data directly:
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **32 Analytics Tools** | Complete coverage of Rybbit API — overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys, site management |
-| **Flexible Auth** | API key (recommended) or email/password authentication |
-| **Smart Filtering** | Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types |
-| **Time Ranges** | Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`) |
-| **Time Series** | Configurable bucket granularity from minutes to years |
-| **Pagination** | Built-in page/limit support for large datasets |
-| **Response Truncation** | Auto-truncation at 25k chars to prevent context bloat |
-| **Actionable Errors** | Error messages guide the LLM toward correct tool usage |
-
----
+- "How many users visited the site today?"
+- "Show me the top pages by bounce rate this week"
+- "What errors occurred in the last hour?"
+- "Show user journey from homepage to checkout"
+- "Compare browser usage between mobile and desktop"
 
 ## Authentication
 
@@ -109,8 +103,6 @@ Supports two authentication methods:
 | **Email/Password** | `RYBBIT_EMAIL`, `RYBBIT_PASSWORD` | Development/testing |
 
 Both require `RYBBIT_URL` pointing to your Rybbit instance.
-
----
 
 ## Tools (32)
 
@@ -186,8 +178,6 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 |------|-------------|
 | `rybbit_get_journeys` | User navigation path analysis |
 
----
-
 ## Common Parameters
 
 All analytics tools support these optional parameters:
@@ -213,7 +203,12 @@ All analytics tools support these optional parameters:
 
 `minute`, `five_minutes`, `ten_minutes`, `fifteen_minutes`, `hour`, `day`, `week`, `month`, `year`
 
----
+## Related Projects
+
+- [Rybbit Analytics](https://github.com/rybbit-io/rybbit)
+- [npm Package](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
+- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) — TypeScript tracking SDK
+- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk) — Flutter/Dart tracking SDK
 
 ## Development
 
@@ -230,15 +225,6 @@ npm run dev
 # Type checking
 npx tsc --noEmit
 ```
-
----
-
-## Requirements
-
-- **Node.js**: 18+
-- **Rybbit Analytics**: Self-hosted or cloud instance
-
----
 
 ## Contributing
 
@@ -259,15 +245,6 @@ Contributions are welcome! For major changes, please open an issue first.
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## Links
-
-- [Rybbit Analytics](https://github.com/rybbit-io/rybbit)
-- [npm Package](https://www.npmjs.com/package/@nks-hub/rybbit-mcp)
-- [@nks-hub/rybbit-ts](https://github.com/nks-hub/rybbit-ts) — TypeScript tracking SDK
-- [rybbit-flutter-sdk](https://github.com/nks-hub/rybbit-flutter-sdk) — Flutter/Dart tracking SDK
 
 ---
 
