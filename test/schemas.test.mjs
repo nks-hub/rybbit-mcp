@@ -86,6 +86,26 @@ test("the call list covers every registered tool", async () => {
   assert.deepEqual(missing, []);
 });
 
+test("describe_dimension knows every filter dimension, documented in detail or not", async () => {
+  const describe = async (parameter) => (await mcp.call("rybbit_describe_dimension", { parameter })).structuredContent;
+
+  const unknown = await describe("not_a_dimension");
+  assert.match(unknown.description, /^Unknown dimension/);
+  assert.equal(unknown.knownDimensions.length, 31);
+
+  for (const parameter of [...unknown.knownDimensions, "url_param:ref"]) {
+    const res = await describe(parameter);
+    assert.equal(res.parameter, parameter);
+    assert.doesNotMatch(res.description, /Unknown/);
+    assert.equal(res.knownDimensions, undefined);
+  }
+
+  assert.equal((await describe("language")).description, "Valid filter dimension with no known restrictions.");
+  assert.match((await describe("language")).valueHint, /rybbit_get_metric/);
+  assert.match((await describe("url_param:ref")).valueHint, /'ref' URL query parameter/);
+  assert.match((await describe("url_param:")).description, /^Unknown dimension/);
+});
+
 test("get_overview returns the metrics at the top level, nulls included", async () => {
   const res = await mcp.call("rybbit_get_overview", { siteId: 1 });
   assert.deepEqual(res.structuredContent, {

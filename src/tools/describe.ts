@@ -18,7 +18,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, output } from "../response.js";
-import { FILTER_DIMENSIONS } from "../schemas.js";
+import { FILTER_DIMENSIONS, metricParameterSchema } from "../schemas.js";
 
 interface DimensionInfo {
     parameter: string;
@@ -171,7 +171,7 @@ const describeOutput = {
         .describe("Tools that silently strip this filter due to upstream bugs. Use alternatives noted in reason."),
     valueHint: z.string(),
     examples: z.array(z.string()),
-    knownDimensions: z.array(z.string()).optional().describe("Returned only when parameter is unknown — lists all documented dimensions."),
+    knownDimensions: z.array(z.string()).optional().describe("Returned only when parameter is unknown — lists every filter dimension."),
 };
 
 export function registerDescribeTools(server: McpServer): void {
@@ -204,20 +204,34 @@ export function registerDescribeTools(server: McpServer): void {
             },
         },
         async (args) => {
-            const dim = DIMENSIONS[args.parameter];
-            if (!dim) {
-                const result = {
-                    parameter: args.parameter,
-                    description: "Unknown dimension. May still work as a filter but capabilities are undocumented here.",
+            const { parameter } = args;
+            const dim = DIMENSIONS[parameter];
+            if (dim) return jsonResult(dim);
+
+            const urlParam = /^url_param:(.+)$/.exec(parameter)?.[1];
+            if (urlParam || (FILTER_DIMENSIONS as readonly string[]).includes(parameter)) {
+                return jsonResult({
+                    parameter,
+                    description: "Valid filter dimension with no known restrictions.",
                     supportedIn: [],
                     strippedIn: [],
-                    valueHint: "Unknown.",
+                    valueHint: urlParam
+                        ? `Value of the '${urlParam}' URL query parameter.`
+                        : (metricParameterSchema.options as readonly string[]).includes(parameter)
+                          ? `List the values in use with rybbit_get_metric, parameter '${parameter}'.`
+                          : "No list of values is available.",
                     examples: [],
-                    knownDimensions: Object.keys(DIMENSIONS),
-                };
-                return jsonResult(result);
+                });
             }
-            return jsonResult(dim);
+            return jsonResult({
+                parameter,
+                description: "Unknown dimension. May still work as a filter but capabilities are undocumented here.",
+                supportedIn: [],
+                strippedIn: [],
+                valueHint: "Unknown.",
+                examples: [],
+                knownDimensions: [...FILTER_DIMENSIONS],
+            });
         }
     );
 }
