@@ -95,8 +95,8 @@ const eventNamesOutput = {
     .array(
       z
         .object({
-          event_name: z.string().optional(),
-          count: z.number().optional(),
+          eventName: z.string().nullish(),
+          count: z.number().nullish(),
         })
         .passthrough()
     )
@@ -108,9 +108,9 @@ const eventPropertiesOutput = {
     .array(
       z
         .object({
-          key: z.string().optional(),
-          value: z.union([z.string(), z.number(), z.boolean()]).optional(),
-          count: z.number().optional(),
+          propertyKey: z.string().nullish(),
+          propertyValue: z.union([z.string(), z.number(), z.boolean()]).nullish(),
+          count: z.number().nullish(),
         })
         .passthrough()
     )
@@ -122,8 +122,9 @@ const eventTimeseriesOutput = {
     .array(
       z
         .object({
-          time: z.string().optional(),
-          count: z.number().optional(),
+          time: z.string().nullish(),
+          event_name: z.string().nullish(),
+          event_count: z.number().nullish(),
         })
         .passthrough()
     )

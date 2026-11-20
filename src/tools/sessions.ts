@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import {
   analyticsInputSchema,
@@ -8,43 +8,21 @@ import {
   siteIdSchema,
 } from "../schemas.js";
 
-interface SessionSummary {
-  sessionId: string;
-  userId?: string;
-  device?: string;
-  country?: string;
-  city?: string;
-  pagesVisited: number;
-  duration?: number;
-  bounced: boolean;
-  [key: string]: unknown;
-}
-
-interface SessionDetail {
-  sessionId: string;
-  userId?: string;
-  traits?: Record<string, unknown>;
-  device?: string;
-  browser?: string;
-  os?: string;
-  country?: string;
-  region?: string;
-  city?: string;
-  events: unknown[];
-  [key: string]: unknown;
-}
-
 // Output schemas
 const sessionSummaryShape = z
   .object({
-    sessionId: z.string().optional(),
-    userId: z.string().optional(),
-    device: z.string().optional(),
-    country: z.string().optional(),
-    city: z.string().optional(),
-    pagesVisited: z.number().optional(),
-    duration: z.number().optional(),
-    bounced: z.boolean().optional(),
+    session_id: z.string().nullish(),
+    user_id: z.string().nullish().describe("Device hash"),
+    identified_user_id: z.string().nullish().describe("App-provided user ID, empty for anonymous visitors"),
+    session_start: z.string().nullish(),
+    session_end: z.string().nullish(),
+    session_duration: z.number().nullish().describe("Seconds"),
+    entry_page: z.string().nullish(),
+    exit_page: z.string().nullish(),
+    pageviews: z.number().nullish(),
+    events: z.number().nullish(),
+    country: z.string().nullish(),
+    device_type: z.string().nullish(),
   })
   .passthrough();
 
@@ -55,16 +33,30 @@ const listSessionsOutput = {
 };
 
 const sessionDetailOutput = {
-  sessionId: z.string().optional(),
-  userId: z.string().optional(),
-  traits: z.record(z.unknown()).optional(),
-  device: z.string().optional(),
-  browser: z.string().optional(),
-  os: z.string().optional(),
-  country: z.string().optional(),
-  region: z.string().optional(),
-  city: z.string().optional(),
-  events: z.array(z.unknown()).optional(),
+  session: sessionSummaryShape.optional().describe("Session summary: ids, device, location, start/end, counters"),
+  events: z
+    .array(
+      z
+        .object({
+          timestamp: z.string().nullish(),
+          type: z.string().nullish().describe("pageview, custom_event, outbound, ..."),
+          pathname: z.string().nullish(),
+          event_name: z.string().nullish(),
+          props: z.record(z.unknown()).nullish(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Event timeline, oldest first"),
+  pagination: z
+    .object({
+      total: z.number().optional().describe("Events in the session"),
+      limit: z.number().optional(),
+      offset: z.number().optional(),
+      hasMore: z.boolean().optional(),
+    })
+    .passthrough()
+    .optional(),
 };
 
 export function registerSessionsTools(
@@ -76,7 +68,7 @@ export function registerSessionsTools(
     {
       title: "List Sessions",
       description:
-        "List sessions for a site with filtering and pagination. Returns session ID, user info, device, location, pages visited, duration, bounce status, and IP address (if site has trackIp enabled). Supports client-side IP filtering.",
+        "List sessions for a site with filtering and pagination, newest first. Each row has session_id, user ids, device, location, entry/exit page, pageviews, session_duration (seconds) and ip (if the site has trackIp enabled). Supports client-side IP filtering.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -162,14 +154,9 @@ export function registerSessionsTools(
           return jsonResult(filteredResult);
         }
 
-        const data = await client.get<SessionSummary[] | { data: SessionSummary[] }>(
-          `/sites/${siteId}/sessions`,
-          params
-        );
+        const data = await client.get<unknown>(`/sites/${siteId}/sessions`, params);
 
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-
-        return jsonResult(wrapped);
+        return jsonResult({ data: unwrapRows(data).rows });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -185,7 +172,7 @@ export function registerSessionsTools(
     {
       title: "Session Detail",
       description:
-        "Get detailed session information including all page views, events, user traits, device info, location, and full event timeline. Use rybbit_list_sessions first to find session IDs.",
+        "Get one session: `session` (device, location, counters) and `events`, its timeline of page views and events, oldest first. Use rybbit_list_sessions first to find session IDs.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -209,11 +196,11 @@ export function registerSessionsTools(
           sessionId: string;
         };
 
-        const data = await client.get<SessionDetail>(
+        const raw = await client.get<{ data?: Record<string, unknown> }>(
           `/sites/${siteId}/sessions/${sessionId}`
         );
 
-        return jsonResult(data);
+        return jsonResult(raw?.data ?? raw);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

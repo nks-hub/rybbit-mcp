@@ -17,17 +17,6 @@ interface FunnelDefinition {
   [key: string]: unknown;
 }
 
-interface FunnelAnalysisResult {
-  steps: Array<{
-    name: string;
-    count: number;
-    dropoff?: number;
-    dropoffRate?: number;
-    [key: string]: unknown;
-  }>;
-  [key: string]: unknown;
-}
-
 // Output schemas
 const funnelStepShape = z
   .object({
@@ -52,19 +41,20 @@ const listFunnelsOutput = {
 };
 
 const analyzeFunnelOutput = {
-  steps: z
+  data: z
     .array(
       z
         .object({
-          name: z.string().optional(),
-          count: z.number().optional(),
-          dropoff: z.number().optional(),
-          dropoffRate: z.number().optional(),
+          step_number: z.number().nullish(),
+          step_name: z.string().nullish(),
+          sessions: z.number().nullish(),
+          visitors: z.number().nullish(),
+          conversion_rate: z.number().nullish().describe("Percent of the first step; null when nobody entered the funnel"),
+          dropoff_rate: z.number().nullish().describe("Percent lost since the previous step"),
         })
         .passthrough()
     )
-    .optional()
-    .describe("Per-step counts and dropoffs"),
+    .describe("One row per funnel step, in order"),
 };
 
 const funnelStepSessionsOutput = {
@@ -72,9 +62,8 @@ const funnelStepSessionsOutput = {
 };
 
 const createFunnelOutput = {
-  id: z.union([z.string(), z.number()]).optional(),
-  name: z.string().optional(),
-  steps: z.array(funnelStepShape).optional(),
+  success: z.boolean().optional(),
+  funnelId: z.union([z.string(), z.number()]).optional().describe("ID of the saved funnel"),
 };
 
 const deleteFunnelOutput = {
@@ -132,7 +121,7 @@ export function registerFunnelsTools(
     {
       title: "Analyze Funnel",
       description:
-        "Analyze a custom funnel by defining steps (page visits or events). Returns visitor counts and drop-off rates at each step.",
+        "Analyze a custom funnel by defining steps (page visits or events). Returns one row per step with sessions, visitors, conversion_rate and dropoff_rate.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -204,12 +193,12 @@ export function registerFunnelsTools(
 
         const params = client.buildAnalyticsParams(rest);
 
-        const data = await client.post<FunnelAnalysisResult>(
+        const data = await client.post<unknown>(
           `/sites/${siteId}/funnels/analyze`,
           { steps },
           params
         );
-        return jsonResult(data);
+        return jsonResult({ data: unwrapRows(data).rows });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

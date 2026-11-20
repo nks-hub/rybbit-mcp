@@ -43,6 +43,7 @@ export async function connect(backend) {
       const result = await client.callTool({ name, arguments: args });
       return { ...result, text: result.content?.[0]?.text ?? "" };
     },
+    listTools: () => client.listTools(),
     async close() {
       await client.close();
       globalThis.fetch = realFetch;

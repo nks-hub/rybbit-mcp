@@ -4,13 +4,6 @@ import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { filterSchema, siteIdSchema } from "../schemas.js";
 
-interface JourneyPath {
-  path: string[];
-  sessions: number;
-  percentage?: number;
-  [key: string]: unknown;
-}
-
 // Output schema
 const journeysOutput = {
   data: z
@@ -18,12 +11,13 @@ const journeysOutput = {
       z
         .object({
           path: z.array(z.string()).optional(),
-          sessions: z.number().optional(),
-          percentage: z.number().optional(),
+          count: z.number().nullish().describe("Sessions that followed this path"),
+          percentage: z.number().nullish(),
         })
         .passthrough()
     )
     .describe("Journey paths with session counts"),
+  totalSessions: z.number().optional().describe("Sessions the percentages are relative to"),
 };
 
 export function registerJourneysTools(
@@ -110,13 +104,11 @@ export function registerJourneysTools(
         if (steps !== undefined) params.steps = steps;
         if (journeyLimit !== undefined) params.limit = journeyLimit;
 
-        const data = await client.get<JourneyPath[]>(
+        const data = await client.get<{ totalSessions?: number }>(
           `/sites/${siteId}/journeys`,
           params
         );
-        const { rows, totalCount } = unwrapRows(data);
-        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return jsonResult(wrapped);
+        return jsonResult({ data: unwrapRows(data).rows, totalSessions: data?.totalSessions });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

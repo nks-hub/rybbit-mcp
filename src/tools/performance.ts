@@ -4,40 +4,6 @@ import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema } from "../schemas.js";
 
-interface PerformanceOverview {
-  lcp_p50?: number;
-  lcp_p75?: number;
-  lcp_p90?: number;
-  lcp_p99?: number;
-  cls_p50?: number;
-  cls_p75?: number;
-  cls_p90?: number;
-  cls_p99?: number;
-  inp_p50?: number;
-  inp_p75?: number;
-  inp_p90?: number;
-  inp_p99?: number;
-  fcp_p50?: number;
-  fcp_p75?: number;
-  fcp_p90?: number;
-  fcp_p99?: number;
-  ttfb_p50?: number;
-  ttfb_p75?: number;
-  ttfb_p90?: number;
-  ttfb_p99?: number;
-  [key: string]: unknown;
-}
-
-interface PerformanceByDimension {
-  dimension: string;
-  [key: string]: unknown;
-}
-
-interface PerformanceTimeSeries {
-  bucket: string;
-  [key: string]: unknown;
-}
-
 const dimensionSchema = z
   .enum(["overview", "pathname", "browser", "operating_system"])
   .optional()
@@ -46,36 +12,20 @@ const dimensionSchema = z
   );
 
 // Output schemas
+const VITALS = ["lcp", "cls", "inp", "fcp", "ttfb"];
+const VITAL_FIELDS = ["p50", "p75", "p90", "p99", "count", "good", "poor"];
+
 const performanceOutput = {
-  // Overview percentiles (when dimension=overview or unset)
-  lcp_p50: z.number().nullable().optional(),
-  lcp_p75: z.number().nullable().optional(),
-  lcp_p90: z.number().nullable().optional(),
-  lcp_p99: z.number().nullable().optional(),
-  cls_p50: z.number().nullable().optional(),
-  cls_p75: z.number().nullable().optional(),
-  cls_p90: z.number().nullable().optional(),
-  cls_p99: z.number().nullable().optional(),
-  inp_p50: z.number().nullable().optional(),
-  inp_p75: z.number().nullable().optional(),
-  inp_p90: z.number().nullable().optional(),
-  inp_p99: z.number().nullable().optional(),
-  fcp_p50: z.number().nullable().optional(),
-  fcp_p75: z.number().nullable().optional(),
-  fcp_p90: z.number().nullable().optional(),
-  fcp_p99: z.number().nullable().optional(),
-  ttfb_p50: z.number().nullable().optional(),
-  ttfb_p75: z.number().nullable().optional(),
-  ttfb_p90: z.number().nullable().optional(),
-  ttfb_p99: z.number().nullable().optional(),
+  // Overview (dimension=overview or unset): <vital>_p50..p99 percentiles, <vital>_count
+  // samples and how many of them rate good / poor. null means no samples in range.
+  ...Object.fromEntries(
+    VITALS.flatMap((vital) => VITAL_FIELDS.map((field) => [`${vital}_${field}`, z.number().nullish()]))
+  ),
+  total_performance_events: z.number().nullish(),
   // Dimension breakdown rows (when dimension=pathname/browser/operating_system)
   data: z
     .array(
-      z
-        .object({
-          dimension: z.string().optional(),
-        })
-        .passthrough()
+      z.record(z.unknown())
     )
     .optional()
     .describe("Per-dimension rows when dimension!=overview"),
@@ -87,7 +37,8 @@ const performanceTimeseriesOutput = {
     .array(
       z
         .object({
-          bucket: z.string().optional(),
+          time: z.string().nullish(),
+          event_count: z.number().nullish(),
         })
         .passthrough()
     )
@@ -103,7 +54,7 @@ export function registerPerformanceTools(
     {
       title: "Web Vitals",
       description:
-        "Get Core Web Vitals performance metrics (LCP, CLS, INP, FCP, TTFB) with p50, p75, p90, p99 percentiles. Optionally break down by page path, browser, or OS.",
+        "Get Core Web Vitals performance metrics (LCP, CLS, INP, FCP, TTFB) with p50, p75, p90, p99 percentiles plus sample counts and how many rate good / poor. Optionally break down by page path, browser, or OS.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -145,7 +96,7 @@ export function registerPerformanceTools(
           dimension === "operating_system"
         ) {
           params.dimension = dimension;
-          const data = await client.get<PerformanceByDimension[]>(
+          const data = await client.get<unknown>(
             `/sites/${siteId}/performance/by-dimension`,
             params
           );
@@ -154,7 +105,7 @@ export function registerPerformanceTools(
           return jsonResult(wrapped);
         }
 
-        const raw = await client.get<{ data?: PerformanceOverview }>(
+        const raw = await client.get<{ data?: Record<string, unknown> }>(
           `/sites/${siteId}/performance/overview`,
           params
         );
@@ -212,7 +163,7 @@ export function registerPerformanceTools(
 
         const params = client.buildAnalyticsParams({ ...rest, bucket });
 
-        const data = await client.get<PerformanceTimeSeries[]>(
+        const data = await client.get<unknown>(
           `/sites/${siteId}/performance/time-series`,
           params
         );

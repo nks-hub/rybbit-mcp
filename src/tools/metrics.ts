@@ -8,26 +8,19 @@ import {
   paginationSchema,
 } from "../schemas.js";
 
-interface MetricEntry {
-  value: string;
-  count: number;
-  percentage: number;
-  bounceRate?: number;
-  timeOnPage?: number;
-  [key: string]: unknown;
-}
-
 // Output schemas
 const metricOutput = {
   data: z
     .array(
       z
         .object({
-          value: z.string().optional(),
-          count: z.number().optional(),
-          percentage: z.number().optional(),
-          bounceRate: z.number().optional(),
-          timeOnPage: z.number().optional(),
+          value: z.string().nullish(),
+          count: z.number().nullish().describe("Sessions"),
+          percentage: z.number().nullish(),
+          pageviews: z.number().nullish(),
+          pageviews_percentage: z.number().nullish(),
+          bounce_rate: z.number().nullish(),
+          time_on_page_seconds: z.number().nullish().describe("Page dimensions only"),
         })
         .passthrough()
     )
@@ -59,7 +52,7 @@ export function registerMetricsTools(
     {
       title: "Metric Breakdown",
       description:
-        "Get metric breakdown by dimension. Use parameter='pathname' for top pages, 'browser'/'operating_system'/'device_type' for tech stats, 'country'/'city' for geo, 'utm_source'/'utm_campaign' for marketing, 'referrer'/'channel' for traffic sources, 'entry_page'/'exit_page' for user flow. Returns sorted list with counts, percentages, bounce rate, and session duration.",
+        "Get metric breakdown by dimension. Use parameter='pathname' for top pages, 'browser'/'operating_system'/'device_type' for tech stats, 'country'/'city' for geo, 'utm_source'/'utm_campaign' for marketing, 'referrer'/'channel' for traffic sources, 'entry_page'/'exit_page' for user flow. Returns rows sorted by sessions with count, percentage, pageviews and bounce_rate.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -95,7 +88,7 @@ export function registerMetricsTools(
         const params = client.buildAnalyticsParams({ ...rest, page, limit });
         params.parameter = parameter;
 
-        const data = await client.get<MetricEntry[]>(
+        const data = await client.get<unknown>(
           `/sites/${siteId}/metric`,
           params
         );

@@ -76,9 +76,10 @@ export function fitToLimit(
  * clients that read only one of the two see the same data.
  */
 export function jsonResult(payload: object) {
-  const fitted = fitToLimit(payload as Record<string, unknown>);
+  const text = JSON.stringify(fitToLimit(payload as Record<string, unknown>));
   return {
-    structuredContent: fitted,
-    content: [{ type: "text" as const, text: JSON.stringify(fitted) }],
+    // Parsed back so both copies agree on what JSON drops (undefined fields).
+    structuredContent: JSON.parse(text) as Record<string, unknown>,
+    content: [{ type: "text" as const, text }],
   };
 }

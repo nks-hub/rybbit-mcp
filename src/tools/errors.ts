@@ -1,21 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, paginationSchema } from "../schemas.js";
 
-interface ErrorName {
-  name: string;
-  count: number;
-  [key: string]: unknown;
-}
-
-interface ErrorEvent {
-  id: string;
-  name: string;
-  message?: string;
-  stack?: string;
-  [key: string]: unknown;
+/** The error endpoints nest rows one level deeper once `page` is sent. */
+function rowsResult(raw: unknown) {
+  const { rows, totalCount } = unwrapRows(raw);
+  return jsonResult({ data: rows, ...(totalCount !== undefined ? { totalCount } : {}) });
 }
 
 // Output schema — single union covering names, events, and timeseries shapes
@@ -25,19 +17,23 @@ const errorsOutput = {
       z
         .object({
           // names rows
-          name: z.string().optional(),
-          count: z.number().optional(),
+          value: z.string().nullish().describe("Error message; pass it as errorMessage"),
+          errorName: z.string().nullish(),
+          count: z.number().nullish(),
+          sessionCount: z.number().nullish(),
           // event rows
-          id: z.string().optional(),
-          message: z.string().optional(),
-          stack: z.string().optional(),
+          timestamp: z.string().nullish(),
+          message: z.string().nullish(),
+          stack: z.string().nullish(),
           // timeseries rows
-          time: z.string().optional(),
+          time: z.string().nullish(),
+          error_count: z.number().nullish(),
         })
         .passthrough()
     )
     .optional()
     .describe("Error rows — shape depends on `type` input (names | events | timeseries)"),
+  totalCount: z.number().optional().describe("Rows across all pages, when the server reports it"),
 };
 
 export function registerErrorsTools(
@@ -111,12 +107,7 @@ export function registerErrorsTools(
             };
           }
           params.errorMessage = errorMessage;
-          const data = await client.get<unknown[]>(
-            `/sites/${siteId}/errors/time-series`,
-            params
-          );
-          const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-          return jsonResult(wrapped);
+          return rowsResult(await client.get(`/sites/${siteId}/errors/time-series`, params));
         }
 
         if (type === "events") {
@@ -127,20 +118,10 @@ export function registerErrorsTools(
             };
           }
           params.errorMessage = errorMessage;
-          const data = await client.get<ErrorEvent[]>(
-            `/sites/${siteId}/errors/events`,
-            params
-          );
-          const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-          return jsonResult(wrapped);
+          return rowsResult(await client.get(`/sites/${siteId}/errors/events`, params));
         }
 
-        const data = await client.get<ErrorName[]>(
-          `/sites/${siteId}/errors/names`,
-          params
-        );
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return jsonResult(wrapped);
+        return rowsResult(await client.get(`/sites/${siteId}/errors/names`, params));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

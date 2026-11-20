@@ -81,6 +81,7 @@ const getSiteIdOutput = {
 
 const updateSiteConfigOutput = {
   success: z.boolean().optional(),
+  message: z.string().optional(),
   config: z.record(z.unknown()).optional(),
 };
 
@@ -98,9 +99,13 @@ const pageTitlesOutput = {
     .array(
       z
         .object({
-          value: z.string().optional(),
-          pageviews: z.number().optional(),
-          sessions: z.number().optional(),
+          value: z.string().nullish().describe("Page title"),
+          pathname: z.string().nullish(),
+          count: z.number().nullish().describe("Sessions"),
+          percentage: z.number().nullish(),
+          pageviews: z.number().nullish(),
+          bounce_rate: z.number().nullish(),
+          time_on_page_seconds: z.number().nullish(),
         })
         .passthrough()
     )
@@ -580,8 +585,8 @@ export function registerConfigTools(
         };
         const params = client.buildAnalyticsParams(rest);
         const data = await client.get(`/sites/${siteId}/page-titles`, params);
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return jsonResult(wrapped);
+        const { rows, totalCount } = unwrapRows(data);
+        return jsonResult({ data: rows, ...(totalCount !== undefined ? { totalCount } : {}) });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

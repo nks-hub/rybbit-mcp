@@ -4,16 +4,6 @@ import { RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
-interface OverviewMetrics {
-  sessions?: number;
-  pageviews?: number;
-  users?: number;
-  pagesPerSession?: number;
-  bounceRate?: number;
-  avgSessionDuration?: number;
-  [key: string]: unknown;
-}
-
 interface TimeseriesDataPoint {
   time: string;
   [key: string]: unknown;
@@ -29,12 +19,12 @@ const liveUsersOutput = {
 };
 
 const overviewOutput = {
-  sessions: z.number().optional(),
-  pageviews: z.number().optional(),
-  users: z.number().optional(),
-  pagesPerSession: z.number().optional(),
-  bounceRate: z.number().optional(),
-  avgSessionDuration: z.number().optional(),
+  sessions: z.number().nullish(),
+  pageviews: z.number().nullish(),
+  users: z.number().nullish(),
+  pages_per_session: z.number().nullish().describe("null when the range has no sessions"),
+  bounce_rate: z.number().nullish().describe("Percent; null when the range has no sessions"),
+  session_duration: z.number().nullish().describe("Average in seconds; null when the range has no sessions"),
 };
 
 const overviewTimeseriesOutput = {
@@ -127,7 +117,7 @@ export function registerOverviewTools(
     {
       title: "Site Overview",
       description:
-        "Get aggregated overview metrics for a site: sessions, pageviews, unique users, pages per session, bounce rate, and average session duration. Supports date range and filters.",
+        "Get aggregated overview metrics for a site: sessions, pageviews, users, pages_per_session, bounce_rate (percent) and session_duration (average seconds). Supports date range and filters.",
       inputSchema: {
         ...analyticsInputSchema,
       },
@@ -154,12 +144,12 @@ export function registerOverviewTools(
           pastMinutesEnd: args.pastMinutesEnd,
         });
 
-        const data = await client.get<OverviewMetrics>(
+        const raw = await client.get<{ data?: Record<string, unknown> }>(
           `/sites/${args.siteId}/overview`,
           params
         );
 
-        return jsonResult(data);
+        return jsonResult(raw?.data ?? raw);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

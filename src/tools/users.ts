@@ -35,6 +35,9 @@ interface AggregatedUser {
 // Output schemas
 const listUsersOutput = {
   data: z.array(z.record(z.unknown())).optional().describe("User rows"),
+  totalCount: z.number().optional().describe("Users matching the query, across all pages"),
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
 };
 
 const userDetailOutput = {
@@ -58,8 +61,13 @@ const userTraitsOutput = {
       ])
     )
     .optional(),
-  values: z.array(z.record(z.string(), z.unknown())).optional(),
-  data: z.unknown().optional(),
+  values: z
+    .array(z.object({ value: z.string().nullish(), userCount: z.number().nullish() }).passthrough())
+    .optional()
+    .describe("mode=values: distinct values of the trait"),
+  users: z.array(z.record(z.unknown())).optional().describe("mode=users: users having the trait value"),
+  total: z.number().optional().describe("Values or users matching, across all pages"),
+  hasMore: z.boolean().optional(),
 };
 
 const userEventBreakdownOutput = {
@@ -67,8 +75,8 @@ const userEventBreakdownOutput = {
     .array(
       z
         .object({
-          event_name: z.string().optional(),
-          count: z.number().optional(),
+          eventName: z.string().nullish(),
+          count: z.number().nullish(),
         })
         .passthrough()
     )

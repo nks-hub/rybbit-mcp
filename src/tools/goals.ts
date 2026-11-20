@@ -4,25 +4,16 @@ import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { filterSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
-interface Goal {
-  id: string | number;
-  name: string;
-  type: string;
-  value?: string;
-  conversions?: number;
-  conversionRate?: number;
-  [key: string]: unknown;
-}
-
 // Output schemas
 const goalShape = z
   .object({
-    id: z.union([z.string(), z.number()]).optional(),
-    name: z.string().optional(),
-    type: z.string().optional(),
-    value: z.string().optional(),
-    conversions: z.number().optional(),
-    conversionRate: z.number().optional(),
+    goalId: z.number().nullish(),
+    name: z.string().nullish(),
+    goalType: z.string().nullish().describe("path or event"),
+    config: z.record(z.unknown()).nullish(),
+    total_conversions: z.number().nullish(),
+    total_sessions: z.number().nullish(),
+    conversion_rate: z.number().nullish(),
   })
   .passthrough();
 
@@ -35,9 +26,8 @@ const goalSessionsOutput = {
 };
 
 const goalMutationOutput = {
-  id: z.union([z.string(), z.number()]).optional(),
-  name: z.string().optional(),
   success: z.boolean().optional(),
+  goalId: z.number().optional(),
   message: z.string().optional(),
 };
 
@@ -108,7 +98,7 @@ export function registerGoalsTools(
 
         const params = client.buildAnalyticsParams(rest);
 
-        const data = await client.get<Goal[]>(
+        const data = await client.get<unknown>(
           `/sites/${siteId}/goals`,
           params
         );
