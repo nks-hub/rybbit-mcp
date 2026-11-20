@@ -59,7 +59,14 @@ const listSitesOutput = {
 
 const createSiteOutput = {
   message: z.string().optional(),
-  siteId: z.union([z.string(), z.number()]).optional(),
+  siteId: z
+    .union([z.string(), z.number()])
+    .optional()
+    .describe("Numeric site ID, the value rybbit_list_sites and rybbit_get_site_id report"),
+  stringId: z
+    .string()
+    .optional()
+    .describe("Opaque string ID of the same site; accepted wherever siteId is"),
   domain: z.string().optional(),
   name: z.string().optional(),
   organizationId: z.union([z.string(), z.number()]).optional(),
@@ -215,7 +222,7 @@ export function registerConfigTools(
     {
       title: "Create Site",
       description:
-        "Create a new site in Rybbit. Use type 'web' for websites (domain like 'example.com') or type 'mobile' for mobile apps (package name like 'com.example.app'). 'app' is accepted as a legacy alias for 'mobile'. Returns the created site with its siteId for tracking integration.",
+        "Create a new site in Rybbit. Use type 'web' for websites (domain like 'example.com') or type 'mobile' for mobile apps (package name like 'com.example.app'). 'app' is accepted as a legacy alias for 'mobile'. Returns the numeric siteId (the one every other tool and rybbit_get_site_id use) and stringId, an opaque alias of the same site.",
       inputSchema: {
         domain: z
           .string()
@@ -274,7 +281,8 @@ export function registerConfigTools(
 
         const result = {
           message: `Site '${data.domain}' created successfully${isMobile ? " (blockBots disabled for mobile site)" : ""}`,
-          siteId: data.id,
+          siteId: data.siteId !== undefined ? String(data.siteId) : data.id,
+          stringId: data.id,
           domain: data.domain,
           name: data.name,
           organizationId: data.organizationId,
@@ -296,7 +304,7 @@ export function registerConfigTools(
     {
       title: "Get Site ID by Domain",
       description:
-        "Look up a site by domain name. Returns the numeric siteId used for analytics API queries. Note: for SDK tracking setup, use the hash siteId returned by rybbit_create_site instead.",
+        "Look up a site by domain name. Returns the numeric siteId to pass to the other tools, the same value rybbit_create_site and rybbit_list_sites report.",
       inputSchema: {
         domain: z
           .string()

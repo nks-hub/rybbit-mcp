@@ -155,19 +155,30 @@ export class RybbitClient {
 }
 
 function formatApiError(status: number, body: string): string {
+  // The server names what went wrong ("Goal not found", "user_id is required").
+  let detail = body.slice(0, 300);
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+    const text = parsed.message ?? parsed.error;
+    if (typeof text === "string") detail = text;
+  } catch {
+    // not JSON: keep the raw text
+  }
+  const said = detail ? ` Server said: ${detail}.` : "";
+
   switch (status) {
     case 401:
-      return "Authentication failed. Check RYBBIT_API_KEY or RYBBIT_EMAIL/RYBBIT_PASSWORD environment variables.";
+      return `Not authorized (401).${said} Either the credentials are wrong (check RYBBIT_API_KEY or RYBBIT_EMAIL/RYBBIT_PASSWORD) or an ID in the request, such as organizationId, does not exist or belongs to someone else. rybbit_list_sites shows the organization and site IDs these credentials can use.`;
     case 403:
-      return "Permission denied. You don't have access to this site. Use rybbit_list_sites to see available sites.";
+      return `Permission denied (403).${said} The site does not exist or these credentials have no access to it. Use rybbit_list_sites to see available sites.`;
     case 404:
-      return "Resource not found. Check the siteId, sessionId, or userId is correct. Use rybbit_list_sites to see valid site IDs.";
+      return `Not found (404).${said} Check the IDs passed to this tool.`;
     case 429:
       return "Rate limit exceeded. Wait a moment before making more requests.";
     case 500:
-      return `Server error (500). The Rybbit instance may be overloaded. ${body ? "Details: " + body.slice(0, 200) : ""}`;
+      return `Server error (500).${said} The request may not be valid for this endpoint, or the Rybbit instance is overloaded.`;
     default:
-      return `API error (${status}). ${body ? body.slice(0, 300) : ""}`;
+      return `API error (${status}).${said}`;
   }
 }
 

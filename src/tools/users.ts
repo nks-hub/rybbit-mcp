@@ -350,6 +350,24 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         let data: unknown;
         const resolvedMode = args.mode ?? (args.key ? "values" : "keys");
 
+        const missing =
+          resolvedMode === "values" && !args.key
+            ? "mode='values' needs `key`"
+            : resolvedMode === "users" && (!args.key || args.value === undefined)
+              ? "mode='users' needs both `key` and `value`"
+              : undefined;
+        if (missing) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${missing}. Call with mode='keys' to list the trait keys of this site.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         if (resolvedMode === "users") {
           // API does exact (case-sensitive) match, so resolve the correct case first
           let resolvedValue = args.value;
