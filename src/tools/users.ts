@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FilterParam, QueryParams, RybbitClient } from "../client.js";
+import { FilterParam, QueryParams, RybbitClient, pageRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, limitSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
@@ -119,9 +119,10 @@ async function fetchUsersByDuration(
     pastMinutesStart?: number;
     pastMinutesEnd?: number;
     sortOrder?: string;
+    page: number;
     limit: number;
   }
-): Promise<{ data: AggregatedUser[] }> {
+): Promise<{ data: AggregatedUser[]; totalCount: number }> {
   // Fetch sessions in batches to aggregate duration per user
   const allSessions: SessionRow[] = [];
   let page = 1;
@@ -179,7 +180,7 @@ async function fetchUsersByDuration(
       : b.total_duration - a.total_duration
   );
 
-  return { data: sorted.slice(0, args.limit) };
+  return pageRows(sorted, args.page, args.limit);
 }
 
 export function registerUsersTools(server: McpServer, client: RybbitClient): void {
@@ -235,6 +236,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
             pastMinutesStart: args.pastMinutesStart,
             pastMinutesEnd: args.pastMinutesEnd,
             sortOrder: args.sortOrder,
+            page: args.page,
             limit: args.limit,
           });
           return jsonResult(data);
