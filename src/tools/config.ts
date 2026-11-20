@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, siteIdSchema } from "../schemas.js";
 
 interface VersionResponse {
@@ -116,7 +117,7 @@ export function registerConfigTools(
       title: "Get Rybbit Config",
       description: "Get Rybbit server version and configuration",
       inputSchema: {},
-      outputSchema: configOutput,
+      outputSchema: output(configOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading config…",
         "openai/toolInvocation/invoked": "Config loaded",
@@ -141,15 +142,7 @@ export function registerConfigTools(
           mapboxToken: configData.mapboxToken,
         };
 
-        return {
-          structuredContent: combined as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(combined),
-            },
-          ],
-        };
+        return jsonResult(combined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -167,7 +160,7 @@ export function registerConfigTools(
       description:
         "List all sites and organizations the authenticated user has access to",
       inputSchema: {},
-      outputSchema: listSitesOutput,
+      outputSchema: output(listSitesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing sites…",
         "openai/toolInvocation/invoked": "Sites listed",
@@ -185,15 +178,7 @@ export function registerConfigTools(
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(wrapped),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -228,7 +213,7 @@ export function registerConfigTools(
           .optional()
           .describe("Site type: 'web' for websites (default), 'mobile' for mobile apps. 'app' is a legacy alias mapped to 'mobile'."),
       },
-      outputSchema: createSiteOutput,
+      outputSchema: output(createSiteOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Creating site…",
         "openai/toolInvocation/invoked": "Site created",
@@ -274,15 +259,7 @@ export function registerConfigTools(
           organizationId: data.organizationId,
         };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(result),
-            },
-          ],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -306,7 +283,7 @@ export function registerConfigTools(
             "Domain to search for (e.g. 'example.com'). Partial match supported."
           ),
       },
-      outputSchema: getSiteIdOutput,
+      outputSchema: output(getSiteIdOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Looking up site…",
         "openai/toolInvocation/invoked": "Lookup done",
@@ -344,30 +321,12 @@ export function registerConfigTools(
             matches: [],
             message: `No site found matching '${domain}'. Use rybbit_list_sites to see all available sites, or rybbit_create_site to create one.`,
           };
-          return {
-            structuredContent: noMatch as unknown as Record<string, unknown>,
-            content: [
-              {
-                type: "text" as const,
-                text: noMatch.message,
-              },
-            ],
-          };
+          return jsonResult(noMatch);
         }
 
         const result = { matches };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(
-                matches.length === 1 ? matches[0] : matches
-              ),
-            },
-          ],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -456,7 +415,7 @@ export function registerConfigTools(
         sessionReplay: z.boolean().optional().describe("Enable session replay recording"),
         webVitals: z.boolean().optional().describe("Track Core Web Vitals metrics"),
       },
-      outputSchema: updateSiteConfigOutput,
+      outputSchema: output(updateSiteConfigOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Updating site config…",
         "openai/toolInvocation/invoked": "Config updated",
@@ -484,19 +443,11 @@ export function registerConfigTools(
         }
 
         if (Object.keys(body).length === 0) {
-          const noChange = {
+          return jsonResult({
             success: false,
-            config: {} as Record<string, unknown>,
-          };
-          return {
-            structuredContent: noChange as unknown as Record<string, unknown>,
-            content: [
-              {
-                type: "text" as const,
-                text: "No configuration changes provided. Specify at least one setting to update.",
-              },
-            ],
-          };
+            message: "No configuration changes provided. Specify at least one setting to update.",
+            config: {},
+          });
         }
 
         const data = await client.put<{ success: boolean; config: Record<string, unknown> }>(
@@ -504,15 +455,7 @@ export function registerConfigTools(
           body
         );
 
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(data),
-            },
-          ],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -532,7 +475,7 @@ export function registerConfigTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
-      outputSchema: deleteSiteOutput,
+      outputSchema: output(deleteSiteOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Deleting site…",
         "openai/toolInvocation/invoked": "Site deleted",
@@ -555,15 +498,7 @@ export function registerConfigTools(
           ...data,
         };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(result),
-            },
-          ],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -583,7 +518,7 @@ export function registerConfigTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
-      outputSchema: siteHasDataOutput,
+      outputSchema: output(siteHasDataOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Checking data…",
         "openai/toolInvocation/invoked": "Check complete",
@@ -600,10 +535,7 @@ export function registerConfigTools(
         const data = await client.get<{ hasData: boolean }>(
           `/sites/${siteId}/has-data`
         );
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -623,7 +555,7 @@ export function registerConfigTools(
       inputSchema: {
         ...analyticsInputSchema,
       },
-      outputSchema: pageTitlesOutput,
+      outputSchema: output(pageTitlesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading page titles…",
         "openai/toolInvocation/invoked": "Titles loaded",
@@ -649,10 +581,7 @@ export function registerConfigTools(
         const params = client.buildAnalyticsParams(rest);
         const data = await client.get(`/sites/${siteId}/page-titles`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

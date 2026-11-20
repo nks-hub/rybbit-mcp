@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FilterParam, QueryParams, RybbitClient, truncateResponse } from "../client.js";
+import { FilterParam, QueryParams, RybbitClient } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface SessionRow {
@@ -198,7 +199,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .optional()
           .describe("Sort direction (default: 'desc')"),
       },
-      outputSchema: listUsersOutput,
+      outputSchema: output(listUsersOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing users…",
         "openai/toolInvocation/invoked": "Users loaded",
@@ -217,10 +218,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
             sortOrder: args.sortOrder,
             limit: args.limit,
           });
-          return {
-            structuredContent: data as unknown as Record<string, unknown>,
-            content: [{ type: "text" as const, text: truncateResponse(data) }],
-          };
+          return jsonResult(data);
         }
 
         // Workaround: event_name filter crashes the backend getUsers endpoint
@@ -240,18 +238,18 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         if (args.sortOrder) params.sort_order = args.sortOrder;
         const data = await client.get(`/sites/${args.siteId}/users`, params);
 
-        const warning = hadEventFilter
-          ? "\n\nNote: event_name filter was removed (not supported for user listing due to backend limitation). Use rybbit_get_user_event_breakdown to find users by specific events."
-          : "";
-
         const wrapped = Array.isArray(data)
           ? { data }
           : (data as Record<string, unknown>);
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) + warning }],
-        };
+        return jsonResult(
+          hadEventFilter
+            ? {
+                ...wrapped,
+                note: "The event_name filter was ignored: user listing does not support it. Use rybbit_get_event_user_leaderboard to rank users by an event.",
+              }
+            : wrapped
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -273,7 +271,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         siteId: siteIdSchema,
         userId: z.string().describe("User ID (identified_user_id or internal user ID)"),
       },
-      outputSchema: userDetailOutput,
+      outputSchema: output(userDetailOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading user…",
         "openai/toolInvocation/invoked": "User loaded",
@@ -285,10 +283,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { data };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -324,7 +319,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .describe("Trait value (required for 'users' mode)"),
         limit: z.number().optional().describe("Max results to return"),
       },
-      outputSchema: userTraitsOutput,
+      outputSchema: output(userTraitsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading traits…",
         "openai/toolInvocation/invoked": "Traits loaded",
@@ -363,10 +358,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { data };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -393,7 +385,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         ...analyticsInputSchema,
         userId: z.string().describe("User ID — either Rybbit device hash (user_id) or app-provided ID (identified_user_id). Both are checked."),
       },
-      outputSchema: userEventBreakdownOutput,
+      outputSchema: output(userEventBreakdownOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading breakdown…",
         "openai/toolInvocation/invoked": "Breakdown loaded",
@@ -417,10 +409,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
 
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -452,7 +441,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         pastMinutesStart: z.number().optional(),
         pastMinutesEnd: z.number().optional(),
       },
-      outputSchema: userSessionCountOutput,
+      outputSchema: output(userSessionCountOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Counting sessions…",
         "openai/toolInvocation/invoked": "Counts loaded",
@@ -482,10 +471,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
 
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

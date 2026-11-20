@@ -3,7 +3,7 @@
  */
 
 import { AuthConfig, getAuthHeaders } from "./auth.js";
-import { CHARACTER_LIMIT, REQUEST_TIMEOUT_MS } from "./constants.js";
+import { REQUEST_TIMEOUT_MS } from "./constants.js";
 
 export interface FilterParam {
   parameter: string;
@@ -159,25 +159,6 @@ function formatApiError(status: number, body: string): string {
     default:
       return `API error (${status}). ${body ? body.slice(0, 300) : ""}`;
   }
-}
-
-export function truncateResponse(data: unknown): string {
-  const json = JSON.stringify(data, null, 2);
-  if (json.length <= CHARACTER_LIMIT) return json;
-
-  if (Array.isArray(data)) {
-    const half = Math.max(1, Math.floor(data.length / 2));
-    const truncated = data.slice(0, half);
-    const result = {
-      data: truncated,
-      truncated: true,
-      truncation_message: `Response truncated from ${data.length} to ${half} items (exceeded ${CHARACTER_LIMIT} char limit). Use pagination (page/limit) or add filters to reduce results.`,
-    };
-    return JSON.stringify(result, null, 2);
-  }
-
-  return json.slice(0, CHARACTER_LIMIT) +
-    `\n\n[Response truncated at ${CHARACTER_LIMIT} characters. Use filters or pagination to reduce data.]`;
 }
 
 /**

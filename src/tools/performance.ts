@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema } from "../schemas.js";
 
 interface PerformanceOverview {
@@ -113,7 +114,7 @@ export function registerPerformanceTools(
         ...analyticsInputSchema,
         dimension: dimensionSchema,
       },
-      outputSchema: performanceOutput,
+      outputSchema: output(performanceOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading web vitals…",
         "openai/toolInvocation/invoked": "Web vitals loaded",
@@ -150,10 +151,7 @@ export function registerPerformanceTools(
           );
           const { rows, totalCount } = unwrapRows(data);
           const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-          return {
-            structuredContent: wrapped as unknown as Record<string, unknown>,
-            content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
-          };
+          return jsonResult(wrapped);
         }
 
         const raw = await client.get<{ data?: PerformanceOverview }>(
@@ -162,10 +160,7 @@ export function registerPerformanceTools(
         );
         // v2.6 nests the percentiles under `data`; null means no samples in range
         const data = raw?.data ?? raw;
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -192,7 +187,7 @@ export function registerPerformanceTools(
         ...analyticsInputSchema,
         bucket: bucketSchema,
       },
-      outputSchema: performanceTimeseriesOutput,
+      outputSchema: output(performanceTimeseriesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Querying timeseries…",
         "openai/toolInvocation/invoked": "Timeseries loaded",
@@ -223,10 +218,7 @@ export function registerPerformanceTools(
         );
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

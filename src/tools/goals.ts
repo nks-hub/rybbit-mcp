@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { filterSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface Goal {
@@ -83,7 +84,7 @@ export function registerGoalsTools(
           .optional()
           .describe("Minutes ago end"),
       },
-      outputSchema: listGoalsOutput,
+      outputSchema: output(listGoalsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing goals…",
         "openai/toolInvocation/invoked": "Goals loaded",
@@ -113,10 +114,7 @@ export function registerGoalsTools(
         );
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -170,7 +168,7 @@ export function registerGoalsTools(
           .describe("Minutes ago end"),
         ...paginationSchema,
       },
-      outputSchema: goalSessionsOutput,
+      outputSchema: output(goalSessionsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading sessions…",
         "openai/toolInvocation/invoked": "Sessions loaded",
@@ -202,10 +200,7 @@ export function registerGoalsTools(
           params
         );
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -265,7 +260,7 @@ export function registerGoalsTools(
         goalType: z.enum(["path", "event"]).describe("'path' = URL pattern, 'event' = custom event"),
         config: goalConfigSchema,
       },
-      outputSchema: goalMutationOutput,
+      outputSchema: output(goalMutationOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Creating goal…",
         "openai/toolInvocation/invoked": "Goal created",
@@ -284,10 +279,7 @@ export function registerGoalsTools(
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { data };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -316,7 +308,7 @@ export function registerGoalsTools(
         goalType: z.enum(["path", "event"]),
         config: goalConfigSchema,
       },
-      outputSchema: goalMutationOutput,
+      outputSchema: output(goalMutationOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Updating goal…",
         "openai/toolInvocation/invoked": "Goal updated",
@@ -342,10 +334,7 @@ export function registerGoalsTools(
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { data };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -371,7 +360,7 @@ export function registerGoalsTools(
         siteId: siteIdSchema,
         goalId: z.number().int().positive().describe("Numeric goal ID to delete"),
       },
-      outputSchema: goalMutationOutput,
+      outputSchema: output(goalMutationOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Deleting goal…",
         "openai/toolInvocation/invoked": "Goal deleted",
@@ -384,10 +373,7 @@ export function registerGoalsTools(
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { success: true };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

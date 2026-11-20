@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, filterSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface FunnelStep {
@@ -100,7 +101,7 @@ export function registerFunnelsTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
-      outputSchema: listFunnelsOutput,
+      outputSchema: output(listFunnelsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing funnels…",
         "openai/toolInvocation/invoked": "Funnels loaded",
@@ -115,10 +116,7 @@ export function registerFunnelsTools(
         );
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -181,7 +179,7 @@ export function registerFunnelsTools(
           .min(2)
           .describe("Funnel steps to analyze (minimum 2)"),
       },
-      outputSchema: analyzeFunnelOutput,
+      outputSchema: output(analyzeFunnelOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Analyzing funnel…",
         "openai/toolInvocation/invoked": "Funnel analyzed",
@@ -211,10 +209,7 @@ export function registerFunnelsTools(
           { steps },
           params
         );
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -286,7 +281,7 @@ export function registerFunnelsTools(
           .describe("The funnel steps definition (same as used in rybbit_analyze_funnel)"),
         ...paginationSchema,
       },
-      outputSchema: funnelStepSessionsOutput,
+      outputSchema: output(funnelStepSessionsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading step sessions…",
         "openai/toolInvocation/invoked": "Sessions loaded",
@@ -322,10 +317,7 @@ export function registerFunnelsTools(
           params
         );
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -368,7 +360,7 @@ export function registerFunnelsTools(
           .optional()
           .describe("Optional existing funnel report ID to overwrite (instead of creating a new one)"),
       },
-      outputSchema: createFunnelOutput,
+      outputSchema: output(createFunnelOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Saving funnel…",
         "openai/toolInvocation/invoked": "Funnel saved",
@@ -387,10 +379,7 @@ export function registerFunnelsTools(
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { data };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -418,7 +407,7 @@ export function registerFunnelsTools(
           .union([z.string(), z.number()])
           .describe("Funnel ID to delete (from rybbit_list_funnels)"),
       },
-      outputSchema: deleteFunnelOutput,
+      outputSchema: output(deleteFunnelOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Deleting funnel…",
         "openai/toolInvocation/invoked": "Funnel deleted",
@@ -431,10 +420,7 @@ export function registerFunnelsTools(
         const wrapped = (data && typeof data === "object" && !Array.isArray(data))
           ? (data as Record<string, unknown>)
           : { success: true };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface OverviewMetrics {
@@ -78,7 +79,7 @@ export function registerOverviewTools(
       inputSchema: {
         siteId: siteIdSchema,
       },
-      outputSchema: liveUsersOutput,
+      outputSchema: output(liveUsersOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Reading live users…",
         "openai/toolInvocation/invoked": "Live users loaded",
@@ -110,15 +111,7 @@ export function registerOverviewTools(
 
         const result = { liveUsers: count };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(result),
-            },
-          ],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -138,7 +131,7 @@ export function registerOverviewTools(
       inputSchema: {
         ...analyticsInputSchema,
       },
-      outputSchema: overviewOutput,
+      outputSchema: output(overviewOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Querying overview…",
         "openai/toolInvocation/invoked": "Overview loaded",
@@ -166,15 +159,7 @@ export function registerOverviewTools(
           params
         );
 
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(data),
-            },
-          ],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -195,7 +180,7 @@ export function registerOverviewTools(
         ...analyticsInputSchema,
         bucket: bucketSchema,
       },
-      outputSchema: overviewTimeseriesOutput,
+      outputSchema: output(overviewTimeseriesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Querying timeseries…",
         "openai/toolInvocation/invoked": "Timeseries loaded",
@@ -227,15 +212,7 @@ export function registerOverviewTools(
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(wrapped),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -256,7 +233,7 @@ export function registerOverviewTools(
         ...analyticsInputSchema,
         ...paginationSchema,
       },
-      outputSchema: sessionLocationsOutput,
+      outputSchema: output(sessionLocationsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading locations…",
         "openai/toolInvocation/invoked": "Locations loaded",
@@ -279,15 +256,7 @@ export function registerOverviewTools(
 
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(data),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

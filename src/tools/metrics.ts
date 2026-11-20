@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import {
   analyticsInputSchema,
   metricParameterSchema,
@@ -70,7 +71,7 @@ export function registerMetricsTools(
         parameter: metricParameterSchema,
         ...paginationSchema,
       },
-      outputSchema: metricOutput,
+      outputSchema: output(metricOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Querying metric…",
         "openai/toolInvocation/invoked": "Metric loaded",
@@ -102,15 +103,7 @@ export function registerMetricsTools(
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(wrapped),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -136,7 +129,7 @@ export function registerMetricsTools(
       inputSchema: {
         ...analyticsInputSchema,
       },
-      outputSchema: retentionOutput,
+      outputSchema: output(retentionOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading retention…",
         "openai/toolInvocation/invoked": "Retention loaded",
@@ -177,15 +170,7 @@ export function registerMetricsTools(
             }
           : { data: unwrapRows(data).rows };
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(wrapped),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

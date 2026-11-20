@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse, unwrapRows } from "../client.js";
+import { RybbitClient, unwrapRows } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { filterSchema, siteIdSchema } from "../schemas.js";
 
 interface JourneyPath {
@@ -80,7 +81,7 @@ export function registerJourneysTools(
           .optional()
           .describe("Max number of journey paths to return (default 100)"),
       },
-      outputSchema: journeysOutput,
+      outputSchema: output(journeysOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading journeys…",
         "openai/toolInvocation/invoked": "Journeys loaded",
@@ -115,10 +116,7 @@ export function registerJourneysTools(
         );
         const { rows, totalCount } = unwrapRows(data);
         const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(wrapped) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

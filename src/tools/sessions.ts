@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import {
   analyticsInputSchema,
   paginationSchema,
@@ -98,7 +99,7 @@ export function registerSessionsTools(
           .optional()
           .describe("Minimum session duration in seconds."),
       },
-      outputSchema: listSessionsOutput,
+      outputSchema: output(listSessionsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing sessions…",
         "openai/toolInvocation/invoked": "Sessions loaded",
@@ -158,15 +159,7 @@ export function registerSessionsTools(
             scannedPages: fetchPage,
           };
 
-          return {
-            structuredContent: filteredResult as unknown as Record<string, unknown>,
-            content: [
-              {
-                type: "text" as const,
-                text: truncateResponse(filteredResult),
-              },
-            ],
-          };
+          return jsonResult(filteredResult);
         }
 
         const data = await client.get<SessionSummary[] | { data: SessionSummary[] }>(
@@ -176,15 +169,7 @@ export function registerSessionsTools(
 
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
 
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(data),
-            },
-          ],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -211,7 +196,7 @@ export function registerSessionsTools(
         siteId: siteIdSchema,
         sessionId: z.string().describe("Session ID to retrieve"),
       },
-      outputSchema: sessionDetailOutput,
+      outputSchema: output(sessionDetailOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading session…",
         "openai/toolInvocation/invoked": "Session loaded",
@@ -228,15 +213,7 @@ export function registerSessionsTools(
           `/sites/${siteId}/sessions/${sessionId}`
         );
 
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [
-            {
-              type: "text" as const,
-              text: truncateResponse(data),
-            },
-          ],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

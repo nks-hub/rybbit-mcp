@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, paginationSchema } from "../schemas.js";
 
 interface ErrorName {
@@ -73,7 +74,7 @@ export function registerErrorsTools(
           .optional()
           .describe("Time bucket for timeseries type (default: day)"),
       },
-      outputSchema: errorsOutput,
+      outputSchema: output(errorsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading errors…",
         "openai/toolInvocation/invoked": "Errors loaded",
@@ -115,10 +116,7 @@ export function registerErrorsTools(
             params
           );
           const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-          return {
-            structuredContent: wrapped as unknown as Record<string, unknown>,
-            content: [{ type: "text" as const, text: truncateResponse(data) }],
-          };
+          return jsonResult(wrapped);
         }
 
         if (type === "events") {
@@ -134,10 +132,7 @@ export function registerErrorsTools(
             params
           );
           const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-          return {
-            structuredContent: wrapped as unknown as Record<string, unknown>,
-            content: [{ type: "text" as const, text: truncateResponse(data) }],
-          };
+          return jsonResult(wrapped);
         }
 
         const data = await client.get<ErrorName[]>(
@@ -145,10 +140,7 @@ export function registerErrorsTools(
           params
         );
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

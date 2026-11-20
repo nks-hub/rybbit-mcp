@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, truncateResponse } from "../client.js";
+import { RybbitClient } from "../client.js";
+import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
 interface EventRow {
@@ -160,7 +161,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           .optional()
           .describe("Return events strictly newer than this timestamp (UTC). Mirrors beforeTimestamp for forward pagination."),
       },
-      outputSchema: listEventsOutput,
+      outputSchema: output(listEventsOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Listing events…",
         "openai/toolInvocation/invoked": "Events loaded",
@@ -188,10 +189,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         // model consumption. Raw `properties` is kept for backward compat.
         attachParsedProperties(data?.data);
 
-        return {
-          structuredContent: data as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -266,7 +264,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           .optional()
           .describe("Return only the top N groups by count (default 50)."),
       },
-      outputSchema: eventAggregateOutput,
+      outputSchema: output(eventAggregateOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Aggregating…",
         "openai/toolInvocation/invoked": "Aggregate ready",
@@ -403,10 +401,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           windowEnd: filtered[0]?.timestamp as string | undefined,
         };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(result) }],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -442,7 +437,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           .optional()
           .describe("If true (default), exclude anonymous users without identified_user_id."),
       },
-      outputSchema: eventAggregateOutput,
+      outputSchema: output(eventAggregateOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Ranking users…",
         "openai/toolInvocation/invoked": "Leaderboard ready",
@@ -557,10 +552,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           windowEnd: filtered[0]?.timestamp as string | undefined,
         };
 
-        return {
-          structuredContent: result as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(result) }],
-        };
+        return jsonResult(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -581,7 +573,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       inputSchema: {
         ...analyticsInputSchema,
       },
-      outputSchema: eventNamesOutput,
+      outputSchema: output(eventNamesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading event names…",
         "openai/toolInvocation/invoked": "Event names loaded",
@@ -592,10 +584,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/events/names`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -617,7 +606,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         ...analyticsInputSchema,
         eventName: z.string().describe("Event name to get properties for"),
       },
-      outputSchema: eventPropertiesOutput,
+      outputSchema: output(eventPropertiesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading properties…",
         "openai/toolInvocation/invoked": "Properties loaded",
@@ -629,10 +618,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         params.event_name = args.eventName;
         const data = await client.get(`/sites/${args.siteId}/events/properties`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -654,7 +640,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         ...analyticsInputSchema,
         bucket: bucketSchema,
       },
-      outputSchema: eventTimeseriesOutput,
+      outputSchema: output(eventTimeseriesOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Querying timeseries…",
         "openai/toolInvocation/invoked": "Timeseries loaded",
@@ -665,10 +651,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/events/time-series`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -690,7 +673,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         ...analyticsInputSchema,
         ...paginationSchema,
       },
-      outputSchema: outboundLinksOutput,
+      outputSchema: output(outboundLinksOutput),
       _meta: {
         "openai/toolInvocation/invoking": "Loading links…",
         "openai/toolInvocation/invoked": "Links loaded",
@@ -701,10 +684,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const params = client.buildAnalyticsParams(args);
         const data = await client.get(`/sites/${args.siteId}/events/outbound`, params);
         const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return {
-          structuredContent: wrapped as unknown as Record<string, unknown>,
-          content: [{ type: "text" as const, text: truncateResponse(data) }],
-        };
+        return jsonResult(wrapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

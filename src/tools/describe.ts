@@ -17,6 +17,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { jsonResult, output } from "../response.js";
 
 interface DimensionInfo {
     parameter: string;
@@ -192,7 +193,7 @@ export function registerDescribeTools(server: McpServer): void {
                     .string()
                     .describe("Dimension name to describe (e.g. 'event_name', 'user_id', 'pathname'). Case-sensitive."),
             },
-            outputSchema: describeOutput,
+            outputSchema: output(describeOutput),
             _meta: {
                 "openai/toolInvocation/invoking": "Looking up dimension…",
                 "openai/toolInvocation/invoked": "Capability returned",
@@ -210,15 +211,9 @@ export function registerDescribeTools(server: McpServer): void {
                     examples: [],
                     knownDimensions: Object.keys(DIMENSIONS),
                 };
-                return {
-                    structuredContent: result as unknown as Record<string, unknown>,
-                    content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-                };
+                return jsonResult(result);
             }
-            return {
-                structuredContent: dim as unknown as Record<string, unknown>,
-                content: [{ type: "text" as const, text: JSON.stringify(dim, null, 2) }],
-            };
+            return jsonResult(dim);
         }
     );
 }
