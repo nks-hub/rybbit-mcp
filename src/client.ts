@@ -125,16 +125,26 @@ export class RybbitClient {
   }): QueryParams {
     const params: QueryParams = {};
 
+    // The server answers a reversed range with zeros, which reads like "no traffic".
+    if (options.startDate && options.endDate && options.endDate < options.startDate) {
+      throw new Error(
+        `endDate (${options.endDate}) is before startDate (${options.startDate}). Swap them or correct the range.`
+      );
+    }
+
     if (options.startDate) params.start_date = options.startDate;
     if (options.endDate) params.end_date = options.endDate;
     if (options.timeZone) params.time_zone = options.timeZone;
     if (options.filters && options.filters.length > 0) {
       params.filters = JSON.stringify(options.filters);
     }
-    if (options.pastMinutesStart !== undefined)
+    // The server rejects one bound without the other; "until now" is the natural default.
+    if (options.pastMinutesStart !== undefined) {
       params.past_minutes_start = options.pastMinutesStart;
-    if (options.pastMinutesEnd !== undefined)
+      params.past_minutes_end = options.pastMinutesEnd ?? 0;
+    } else if (options.pastMinutesEnd !== undefined) {
       params.past_minutes_end = options.pastMinutesEnd;
+    }
     if (options.bucket) params.bucket = options.bucket;
     if (options.page !== undefined) params.page = options.page;
     if (options.limit !== undefined) params.limit = options.limit;
