@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, pageRows, unwrapRows } from "../client.js";
+import { FilterParam, QueryParams, RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
@@ -10,9 +10,15 @@ interface EventRow {
   [key: string]: unknown;
 }
 
+interface EventsCursor {
+  hasMore?: boolean;
+  oldestTimestamp?: string | null;
+  oldestCursor?: string | null;
+}
+
 interface EventsApiResponse {
   data: EventRow[];
-  cursor?: { hasMore: boolean; oldestTimestamp: string | null };
+  cursor?: EventsCursor;
 }
 
 // Output schemas
@@ -32,11 +38,13 @@ const listEventsOutput = {
   data: z.array(eventRowShape).optional(),
   cursor: z
     .object({
-      hasMore: z.boolean(),
-      oldestTimestamp: z.string().nullable(),
+      hasMore: z.boolean().optional(),
+      oldestTimestamp: z.string().nullish(),
+      oldestCursor: z.string().nullish().describe("Pass as beforeCursor to get the next older page"),
     })
     .passthrough()
-    .optional(),
+    .optional()
+    .describe("Absent when afterTimestamp is used"),
 };
 
 /**
@@ -137,6 +145,67 @@ const outboundLinksOutput = {
   totalCount: z.number().optional().describe("Links in the range, across all pages (the server reports at most 1000)"),
 };
 
+const SCAN_PAGE_SIZE = 1000;
+const DEFAULT_MAX_SCAN = 5000;
+const SCAN_COST_NOTE =
+  "Events are read in pages of 1000, roughly 0.5 s each: the default maxScan of 5000 takes about 3 s, 50000 about 20 s.";
+
+/**
+ * Adds an event_name filter. The server applies it per event, so every row of a
+ * page matches and a scan does not spend its budget on other events.
+ */
+function withEventName(
+  filters: FilterParam[] | undefined,
+  eventName: string | undefined
+): FilterParam[] | undefined {
+  if (!eventName) return filters;
+  return [...(filters ?? []), { parameter: "event_name", type: "equals", value: [eventName] }];
+}
+
+/**
+ * Reads events newest first, following the keyset cursor, until `maxScan` rows
+ * are collected or the range is exhausted.
+ */
+async function scanEvents(
+  client: RybbitClient,
+  siteId: string,
+  baseParams: QueryParams,
+  maxScan: number
+): Promise<{ rows: EventRow[]; hasMore: boolean }> {
+  const rows: EventRow[] = [];
+  let cursor: EventsCursor | undefined;
+  let hasMore = false;
+
+  while (rows.length < maxScan) {
+    const params: QueryParams = {
+      ...baseParams,
+      page_size: Math.min(SCAN_PAGE_SIZE, maxScan - rows.length),
+    };
+    if (cursor?.oldestCursor) params.before_cursor = cursor.oldestCursor;
+    else if (cursor?.oldestTimestamp) params.before_timestamp = cursor.oldestTimestamp;
+
+    const page = await client.get<EventsApiResponse>(`/sites/${siteId}/events`, params);
+    const next = page?.cursor;
+    // A server that ignores the cursor parameter returns the same page again.
+    if (
+      cursor &&
+      next?.oldestCursor === cursor.oldestCursor &&
+      next?.oldestTimestamp === cursor.oldestTimestamp
+    ) {
+      break;
+    }
+
+    const batch = page?.data ?? [];
+    for (const row of batch) rows.push(row);
+    hasMore = Boolean(next?.hasMore);
+    if (batch.length === 0 || !hasMore || !next) break;
+    cursor = next;
+  }
+
+  attachParsedProperties(rows);
+  return { rows, hasMore };
+}
+
 export function registerEventsTools(server: McpServer, client: RybbitClient): void {
   server.registerTool(
     "rybbit_list_events",
@@ -144,24 +213,28 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "List Events",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "List raw events for a site with filtering and pagination. Returns individual event records with timestamps, types, pathnames, event names, and properties. " +
-        "When filtering by event_name, only matching events are returned (not entire sessions). " +
-        "Use beforeTimestamp from a previous response's `cursor.oldestTimestamp` to paginate backwards through history.",
+        "List raw events for a site, newest first. Returns individual event records with timestamps, types, pathnames, event names, and properties. " +
+        "With eventName only matching events are returned. " +
+        "To page back through history pass the previous response's `cursor.oldestCursor` as beforeCursor; there is no page number.",
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        limit: paginationSchema.limit,
         eventName: z
           .string()
           .optional()
-          .describe("Filter to only return events with this exact event_name (e.g., 'ad_click'). More precise than using the filters array which returns entire sessions."),
+          .describe("Only return events with this exact event_name (e.g., 'ad_click')."),
+        beforeCursor: z
+          .string()
+          .optional()
+          .describe("Return the events just older than this cursor. Use cursor.oldestCursor from the previous page."),
         beforeTimestamp: z
           .string()
           .optional()
-          .describe("Return events strictly older than this timestamp (UTC 'YYYY-MM-DD HH:mm:ss'). Use cursor.oldestTimestamp from previous page."),
+          .describe("Return events strictly older than this timestamp (UTC 'YYYY-MM-DD HH:mm:ss'). Events sharing that second are skipped, so page with beforeCursor instead."),
         afterTimestamp: z
           .string()
           .optional()
-          .describe("Return events strictly newer than this timestamp (UTC). Mirrors beforeTimestamp for forward pagination."),
+          .describe("Return events strictly newer than this timestamp (UTC 'YYYY-MM-DD HH:mm:ss'), newest first. The server looks at the latest 500 such events and returns no cursor; cannot be combined with beforeCursor/beforeTimestamp."),
       },
       outputSchema: output(listEventsOutput),
       _meta: {
@@ -171,29 +244,25 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     },
     async (args) => {
       try {
-        const { limit, ...rest } = args;
-        const params = client.buildAnalyticsParams(rest) as Record<string, unknown>;
+        const { limit, eventName, beforeCursor, beforeTimestamp, afterTimestamp, ...rest } = args;
+        const params = client.buildAnalyticsParams({
+          ...rest,
+          filters: withEventName(rest.filters, eventName),
+        });
         if (limit !== undefined) params.page_size = limit;
-        // Pass cursor through to backend if it accepts them; harmless if it
-        // ignores unknown query params.
-        if (args.beforeTimestamp) params.beforeTimestamp = args.beforeTimestamp;
-        if (args.afterTimestamp) params.afterTimestamp = args.afterTimestamp;
-        const data = await client.get<EventsApiResponse>(
-          `/sites/${args.siteId}/events`,
-          params as Record<string, string | number | boolean | undefined>
-        );
+        if (beforeCursor) params.before_cursor = beforeCursor;
+        if (beforeTimestamp) params.before_timestamp = beforeTimestamp;
+        if (afterTimestamp) params.since_timestamp = afterTimestamp;
 
-        // Post-filter: if eventName specified, filter to only matching events
-        // (backend's filter array is session-scoped not event-scoped).
-        if (args.eventName && data?.data) {
-          data.data = data.data.filter((e) => e.event_name === args.eventName);
-        }
+        const data = await client.get<EventsApiResponse>(`/sites/${args.siteId}/events`, params);
 
-        // Parse the `properties` JSON-string into `properties_parsed` for
-        // model consumption. Raw `properties` is kept for backward compat.
-        attachParsedProperties(data?.data);
+        let rows = data?.data ?? [];
+        if (eventName) rows = rows.filter((e) => e.event_name === eventName);
+        // since_timestamp ignores page_size.
+        if (afterTimestamp && limit !== undefined) rows = rows.slice(0, limit);
+        attachParsedProperties(rows);
 
-        return jsonResult(data);
+        return jsonResult({ ...data, data: rows });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -204,19 +273,9 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     }
   );
 
-  // ---------------------------------------------------------------------
-  // rybbit_get_event_aggregate
-  //
-  // Generic in-MCP aggregation over `/sites/:id/events`. Iterates the
-  // cursor (oldestTimestamp) up to `maxScan` events, optionally filters by
-  // event_name + property filters, then groups by one or more dimensions
-  // and returns counts sorted DESC.
-  //
-  // This compensates for the Rybbit backend not exposing a native
-  // event-grouping endpoint. It is honest about its limitation via
-  // `scanned` / `hasMore` so the caller can widen the time window or
-  // shrink the page count if needed.
-  // ---------------------------------------------------------------------
+  // The Rybbit API has no event-grouping endpoint, so this tool scans raw
+  // events and groups them here. `scanned` / `hasMore` tell the caller whether
+  // the scan covered the whole range.
   server.registerTool(
     "rybbit_get_event_aggregate",
     {
@@ -226,13 +285,14 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         "Aggregate events by one or more dimensions (e.g. identified_user_id, traits.username, pathname, properties.room_id). " +
         "Filters by event_name and optional property filters, then groups remaining events. " +
         "Returns `{ groups: [{key, count, first_seen, last_seen, sessions, extras}], scanned, hitCount, hasMore }`. " +
-        "When `hasMore: true`, the scan was capped — narrow the time window or raise `maxScan` for more accuracy.",
+        "When `hasMore: true`, the scan stopped at maxScan before the start of the range: narrow the time window or raise `maxScan`. " +
+        SCAN_COST_NOTE,
       inputSchema: {
         ...analyticsInputSchema,
         eventName: z
           .string()
           .optional()
-          .describe("Optional exact event_name to filter for (e.g., 'pm_sent')."),
+          .describe("Optional exact event_name to filter for (e.g., 'signup')."),
         groupBy: z
           .array(z.string())
           .min(1)
@@ -259,7 +319,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           .min(100)
           .max(50000)
           .optional()
-          .describe("Maximum events to scan from the backend (default 5000)."),
+          .describe(`Maximum events to read, newest first (default ${DEFAULT_MAX_SCAN}).`),
         topN: z
           .number()
           .int()
@@ -276,50 +336,17 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     },
     async (args) => {
       try {
-        const maxScan = args.maxScan ?? 5000;
         const topN = args.topN ?? 50;
-        const pageSize = 200;
-        // Pre-narrow at the upstream by injecting an event_name filter when
-        // requested. The backend's filter array is session-scoped (returns
-        // ALL events from sessions containing a match) — not perfect, but
-        // dramatically reduces the scan compared to no filter at all.
-        const argsWithFilter = args.eventName
-          ? {
-              ...args,
-              filters: [
-                ...(args.filters ?? []),
-                { parameter: "event_name", type: "equals", value: [args.eventName] },
-              ],
-            }
-          : args;
-        const baseParams = client.buildAnalyticsParams(argsWithFilter) as Record<string, unknown>;
-
-        const seen: EventRow[] = [];
-        let cursor: string | undefined;
-        let hasMore = false;
-
-        while (seen.length < maxScan) {
-          const params: Record<string, unknown> = { ...baseParams, limit: pageSize };
-          if (cursor) params.beforeTimestamp = cursor;
-          const page = await client.get<EventsApiResponse>(
-            `/sites/${args.siteId}/events`,
-            params as Record<string, string | number | boolean | undefined>
-          );
-          const rows = page?.data ?? [];
-          if (rows.length === 0) break;
-          attachParsedProperties(rows);
-          for (const r of rows) seen.push(r);
-          if (page.cursor && page.cursor.hasMore && page.cursor.oldestTimestamp) {
-            cursor = page.cursor.oldestTimestamp;
-            hasMore = page.cursor.hasMore;
-          } else {
-            hasMore = false;
-            break;
-          }
-          // Don't exit on rows.length < pageSize — backend may return fewer
-          // than requested even when more data exists (it caps internally).
-          // Rely solely on cursor.hasMore, which was already checked above.
-        }
+        const baseParams = client.buildAnalyticsParams({
+          ...args,
+          filters: withEventName(args.filters, args.eventName),
+        });
+        const { rows: seen, hasMore } = await scanEvents(
+          client,
+          args.siteId,
+          baseParams,
+          args.maxScan ?? DEFAULT_MAX_SCAN
+        );
 
         // Filter scanned events down to matches.
         const filtered = seen.filter((row) => {
@@ -416,30 +443,31 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     }
   );
 
-  // ---------------------------------------------------------------------
-  // rybbit_get_event_user_leaderboard
-  //
-  // Thin convenience wrapper over `rybbit_get_event_aggregate` that groups
-  // by (identified_user_id, traits.username) and returns the top senders /
-  // clickers / actors for a given event.
-  // ---------------------------------------------------------------------
   server.registerTool(
     "rybbit_get_event_user_leaderboard",
     {
       title: "Event User Leaderboard",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Returns the top users for a given event (e.g. who sent the most pm_sent, who clicked the most ad_click). " +
-        "Groups by identified_user_id + traits.username. Answers questions like 'kdo dnes poslal nejvíc vzkazů'.",
+        "Returns the top users for a given event (e.g. who triggered the most message_sent, who clicked the most ad_click). " +
+        "Groups by identified_user_id + traits.username. Answers questions like 'who sent the most messages today'. " +
+        "By default only identified users are ranked; when that leaves events out, `note` says how many and how to include them. " +
+        SCAN_COST_NOTE,
       inputSchema: {
         ...analyticsInputSchema,
-        eventName: z.string().describe("Event name to rank users by (e.g. 'pm_sent', 'chat_v2_message_sent', 'ad_click')."),
+        eventName: z.string().describe("Event name to rank users by (e.g. 'message_sent', 'signup', 'ad_click')."),
         topN: z.number().int().min(1).max(200).optional().describe("Top N users (default 25)."),
-        maxScan: z.number().int().min(100).max(50000).optional().describe("Maximum events to scan (default 5000)."),
+        maxScan: z
+          .number()
+          .int()
+          .min(100)
+          .max(50000)
+          .optional()
+          .describe(`Maximum events to read, newest first (default ${DEFAULT_MAX_SCAN}).`),
         identifiedOnly: z
           .boolean()
           .optional()
-          .describe("If true (default), exclude anonymous users without identified_user_id."),
+          .describe("If true (default), exclude anonymous users without identified_user_id. Set false on sites that do not identify users."),
       },
       outputSchema: output(eventAggregateOutput),
       _meta: {
@@ -450,45 +478,22 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     async (args) => {
       try {
         const identifiedOnly = args.identifiedOnly !== false;
-        const maxScan = args.maxScan ?? 5000;
         const topN = args.topN ?? 25;
-        const pageSize = 200;
-        const baseParams = client.buildAnalyticsParams(args) as Record<string, unknown>;
-
-        const seen: EventRow[] = [];
-        let cursor: string | undefined;
-        let hasMore = false;
-        while (seen.length < maxScan) {
-          const params: Record<string, unknown> = { ...baseParams, limit: pageSize };
-          if (cursor) params.beforeTimestamp = cursor;
-          const page = await client.get<EventsApiResponse>(
-            `/sites/${args.siteId}/events`,
-            params as Record<string, string | number | boolean | undefined>
-          );
-          const rows = page?.data ?? [];
-          if (rows.length === 0) break;
-          attachParsedProperties(rows);
-          for (const r of rows) seen.push(r);
-          if (page.cursor?.hasMore && page.cursor.oldestTimestamp) {
-            cursor = page.cursor.oldestTimestamp;
-            hasMore = page.cursor.hasMore;
-          } else {
-            hasMore = false;
-            break;
-          }
-          // Don't exit on rows.length < pageSize — backend may return fewer
-          // than requested even when more data exists (it caps internally).
-          // Rely solely on cursor.hasMore, which was already checked above.
-        }
-
-        const filtered = seen.filter((row) => {
-          if (row.event_name !== args.eventName) return false;
-          if (identifiedOnly) {
-            const uid = (row as { identified_user_id?: string }).identified_user_id;
-            if (!uid || uid === "") return false;
-          }
-          return true;
+        const baseParams = client.buildAnalyticsParams({
+          ...args,
+          filters: withEventName(args.filters, args.eventName),
         });
+        const { rows: seen, hasMore } = await scanEvents(
+          client,
+          args.siteId,
+          baseParams,
+          args.maxScan ?? DEFAULT_MAX_SCAN
+        );
+
+        const matching = seen.filter((row) => row.event_name === args.eventName);
+        const identified = matching.filter((row) => row.identified_user_id);
+        const filtered = identifiedOnly ? identified : matching;
+        const anonymous = matching.length - identified.length;
 
         interface Bucket {
           identified_user_id: string;
@@ -554,6 +559,11 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           hasMore,
           windowStart: filtered[filtered.length - 1]?.timestamp as string | undefined,
           windowEnd: filtered[0]?.timestamp as string | undefined,
+          ...(identifiedOnly && anonymous > 0
+            ? {
+                note: `${anonymous} matching events came from visitors without an identified_user_id and were left out. Pass identifiedOnly=false to rank them by device user_id.`,
+              }
+            : {}),
         };
 
         return jsonResult(result);
