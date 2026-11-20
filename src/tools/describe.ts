@@ -18,6 +18,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, output } from "../response.js";
+import { FILTER_DIMENSIONS } from "../schemas.js";
 
 interface DimensionInfo {
     parameter: string;
@@ -187,7 +188,10 @@ export function registerDescribeTools(server: McpServer): void {
             description:
                 "Look up which tools accept a given filter dimension (e.g. 'event_name', 'pathname', 'country'), " +
                 "where it works natively, where it is silently stripped due to upstream bugs (with alternative tool suggestions), " +
-                "and example values. Use this before constructing a complex filters[] array.",
+                "and example values. Use this before constructing a complex filters[] array. " +
+                `Filter dimensions accepted in filters[]: ${FILTER_DIMENSIONS.join(", ")}. ` +
+                "user_id matches both the device hash and the app-provided ID; device_model and app_version " +
+                "are filled only for mobile-type sites tracked via the SDK.",
             inputSchema: {
                 parameter: z
                     .string()

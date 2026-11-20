@@ -25,7 +25,7 @@ export const siteIdSchema = z
  * dedicated `/bots` dimension endpoint (its own BOT_DIMENSIONS set), which this
  * MCP does not wrap. They are intentionally omitted here.
  */
-const FILTER_DIMENSIONS = [
+export const FILTER_DIMENSIONS = [
   "browser",
   "browser_version",
   "operating_system",
@@ -63,10 +63,11 @@ export const filterSchema = z.object({
   parameter: z
     .string()
     .describe(
-      `Filter dimension. One of: ${FILTER_DIMENSIONS.join(", ")}. ` +
-        `Custom URL parameters use the prefix 'url_param:NAME' (e.g., 'url_param:campaign_id'). ` +
-        `Note: user_id filter checks BOTH the device hash (user_id) and app-provided ID (identified_user_id). ` +
-        `device_model and app_version are populated only for mobile-type sites (legacy: app) tracked via SDK.`
+      // Kept short on purpose: this schema is embedded in two dozen tools, so the full
+      // list lives once, in the description of rybbit_describe_dimension.
+      "Filter dimension, e.g. browser, country, pathname, device_type, referrer, event_name " +
+        "(all of them are listed by rybbit_describe_dimension). " +
+        "Custom URL parameters use the prefix 'url_param:NAME'."
     ),
   type: z
     .enum([
