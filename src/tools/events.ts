@@ -650,7 +650,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "Event Time Series",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Get custom event counts as time-series data with configurable buckets. Useful for analyzing event trends over time.",
+        "Get custom event counts as time-series data, one row per event name and day unless another bucket is given. Useful for analyzing event trends over time.",
       inputSchema: {
         ...analyticsInputSchema,
         bucket: bucketSchema,

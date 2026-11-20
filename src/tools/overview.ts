@@ -165,7 +165,7 @@ export function registerOverviewTools(
     {
       title: "Overview Time Series",
       description:
-        "Get overview metrics as time-series data with configurable time buckets (minute, hour, day, week, month). Returns arrays of data points for charting trends.",
+        "Get overview metrics as time-series data, one row per day unless another bucket (minute, hour, week, month) is given. Returns arrays of data points for charting trends.",
       inputSchema: {
         ...analyticsInputSchema,
         bucket: bucketSchema,

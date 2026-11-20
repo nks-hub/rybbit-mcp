@@ -124,8 +124,9 @@ export const bucketSchema = z
     "month",
     "year",
   ])
-  .optional()
-  .describe("Time bucket granularity (default: day). Use 'hour' for last 24h, 'week'/'month' for long ranges");
+  // The server falls back to hourly buckets, which is 168 rows for a week.
+  .default("day")
+  .describe("Time bucket granularity. Use 'hour' for a single day, 'week'/'month' for long ranges");
 
 export const paginationSchema = {
   page: z.number().int().min(1).optional().describe("Page number, 1-indexed (default: 1)"),

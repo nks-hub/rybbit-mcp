@@ -127,7 +127,7 @@ export function registerPerformanceTools(
     {
       title: "Web Vitals Time Series",
       description:
-        "Get Core Web Vitals performance metrics as time-series data for trend analysis.",
+        "Get Core Web Vitals performance metrics as time-series data for trend analysis, one row per day unless another bucket is given.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,

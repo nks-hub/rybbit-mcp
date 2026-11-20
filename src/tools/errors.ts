@@ -67,8 +67,9 @@ export function registerErrorsTools(
           .describe("Error message filter (required for type='events' and type='timeseries'). Use type='names' first to discover error messages."),
         bucket: z
           .enum(["minute", "five_minutes", "hour", "day", "week", "month"])
-          .optional()
-          .describe("Time bucket for timeseries type (default: day)"),
+          // The time-series endpoint answers 500 when no bucket is sent.
+          .default("day")
+          .describe("Time bucket for type='timeseries'"),
       },
       outputSchema: output(errorsOutput),
       _meta: {
