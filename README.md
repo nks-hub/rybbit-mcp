@@ -13,7 +13,7 @@
 
 - 🧰 **43 analytics tools** - Overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys and site management
 - 🔐 **Authentication** - API key (recommended) or email and password
-- 🔍 **Filtering** - Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
+- 🔍 **Filtering** - Filter by 31 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
 - 📅 **Time ranges** - Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`)
 - 📈 **Time series** - Daily buckets by default, any size from one minute to one year
 - 📄 **Pagination** - `page` and `limit` with a per-tool default sized to about 10k characters; `totalCount` reports how many rows exist
@@ -201,7 +201,7 @@ All analytics tools support these optional parameters:
 
 ### Filter parameters
 
-`browser`, `operating_system`, `language`, `country`, `region`, `city`, `device_type`, `referrer`, `hostname`, `pathname`, `page_title`, `querystring`, `event_name`, `channel`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `entry_page`, `exit_page`, `user_id`
+`browser`, `browser_version`, `operating_system`, `operating_system_version`, `language`, `country`, `region`, `city`, `device_type`, `device_model`, `app_version`, `dimensions`, `referrer`, `hostname`, `pathname`, `page_title`, `querystring`, `event_name`, `channel`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `entry_page`, `exit_page`, `user_id`, `lat`, `lon`, `timezone`, `tag`
 
 ### Filter types
 
