@@ -54,6 +54,24 @@ export function fitToLimit(
     keep++;
   }
 
+  const first = rows[0];
+  if (key && keep === 0 && first && typeof first === "object" && !Array.isArray(first)) {
+    // One row is over the cap on its own: cut that row's largest array instead.
+    const row = first as Record<string, unknown>;
+    const inner = fitToLimit(row, limit - (size - rowsSize) - noteRoom - 2);
+    const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+    const nested = Object.keys(row).find((k) => len(inner[k]) > 0 && len(inner[k]) < len(row[k]));
+    if (nested) {
+      const cut = `Showing ${len(inner[nested])} of the ${len(row[nested])} rows in '${nested}' of the first of ${rows.length} rows in '${key}', because that row alone would exceed ${limit} characters. Narrow the request to get the rest.`;
+      return {
+        ...payload,
+        [key]: [{ ...row, [nested]: inner[nested] }],
+        truncated: true,
+        note: typeof payload.note === "string" ? `${payload.note} ${cut}` : cut,
+      };
+    }
+  }
+
   if (!key || keep === 0) {
     return {
       truncated: true,
@@ -76,7 +94,15 @@ export function fitToLimit(
  * clients that read only one of the two see the same data.
  */
 export function jsonResult(payload: object) {
-  const text = JSON.stringify(fitToLimit(payload as Record<string, unknown>));
+  const fitted = fitToLimit(payload as Record<string, unknown>);
+  if ("partial" in fitted && !("partial" in payload)) {
+    // The cut-down shape matches no output schema; an error result is not validated against one.
+    return {
+      content: [{ type: "text" as const, text: `Error: ${fitted.note}\npartial: ${fitted.partial}` }],
+      isError: true,
+    };
+  }
+  const text = JSON.stringify(fitted);
   return {
     // Parsed back so both copies agree on what JSON drops (undefined fields).
     structuredContent: JSON.parse(text) as Record<string, unknown>,

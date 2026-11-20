@@ -32,6 +32,17 @@ test("fitToLimit returns a marked partial when there are no rows to drop", () =>
   assert.ok(out.partial.startsWith('{"data":{"blob":"yyy'));
 });
 
+test("fitToLimit cuts the nested rows of a single row that is over the cap", () => {
+  const out = fitToLimit({ data: [{ id: "a", items: rows(100) }, { id: "b", items: [] }], totalCount: 100 }, 2000);
+  assert.ok(JSON.stringify(out).length <= 2000);
+  assert.equal(out.truncated, true);
+  assert.equal(out.totalCount, 100);
+  assert.equal(out.data.length, 1);
+  assert.deepEqual(Object.keys(out.data[0]), ["id", "items"]);
+  assert.ok(out.data[0].items.length > 0 && out.data[0].items.length < 100);
+  assert.match(out.note, new RegExp(`Showing ${out.data[0].items.length} of the 100 rows in 'items' of the first of 2 rows in 'data'`));
+});
+
 test("jsonResult sends identical JSON as text and structuredContent", () => {
   const res = jsonResult({ data: rows(500) });
   assert.deepEqual(JSON.parse(res.content[0].text), res.structuredContent);
@@ -47,6 +58,47 @@ test("an oversized tool response is cut in both copies and still matches the out
     assert.equal(res.structuredContent.truncated, true);
     assert.ok(res.text.length <= 16000);
     assert.ok(res.structuredContent.data.length < 200);
+  } finally {
+    await mcp.close();
+  }
+});
+
+const organization = (sites, name = "Demo Org") => [
+  {
+    id: "org1",
+    name,
+    role: "owner",
+    sites: Array.from({ length: sites }, (_, i) => ({ id: String(i), domain: `site-${i}.example.com`, name: `Site ${i}` })),
+  },
+];
+
+test("list_sites stays valid when its only organization is over the cap", async () => {
+  const mcp = await connect(() => organization(300));
+  try {
+    const res = await mcp.call("rybbit_list_sites");
+    assert.equal(res.isError, undefined);
+    assert.ok(res.text.length <= 16000);
+    assert.deepEqual(JSON.parse(res.text), res.structuredContent);
+    const { data, truncated, note, totalCount } = res.structuredContent;
+    assert.equal(truncated, true);
+    assert.equal(totalCount, 300);
+    assert.equal(data.length, 1);
+    assert.equal(data[0].name, "Demo Org");
+    assert.ok(data[0].sites.length > 0 && data[0].sites.length < 300);
+    assert.match(note, new RegExp(`Showing ${data[0].sites.length} of the 300 rows in 'sites'`));
+  } finally {
+    await mcp.close();
+  }
+});
+
+test("a response that cannot be cut row by row comes back as an error, not a schema failure", async () => {
+  const mcp = await connect(() => organization(0, "n".repeat(20000)));
+  try {
+    const res = await mcp.call("rybbit_list_sites");
+    assert.equal(res.isError, true);
+    assert.equal(res.structuredContent, undefined);
+    assert.match(res.text, /^Error: The response is \d+ characters, over the 16000 character cap/);
+    assert.ok(res.text.length <= 16000);
   } finally {
     await mcp.close();
   }
