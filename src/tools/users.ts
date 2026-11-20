@@ -419,7 +419,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       description:
         "Get event count breakdown for a specific user. Shows how many times each event_name was triggered by this user. " +
         "Accepts either the Rybbit user_id (device hash) or the identified_user_id (app-provided user ID). " +
-        "Useful for analyzing per-user behavior like ad_click, chat_message_sent, etc.",
+        "Useful for analyzing per-user behavior like ad_click, signup, etc.",
       inputSchema: {
         ...analyticsInputSchema,
         userId: z.string().describe("User ID — either Rybbit device hash (user_id) or app-provided ID (identified_user_id). Both are checked."),

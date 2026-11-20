@@ -286,7 +286,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "Event Aggregate",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Aggregate events by one or more dimensions (e.g. identified_user_id, traits.username, pathname, properties.room_id). " +
+        "Aggregate events by one or more dimensions (e.g. identified_user_id, traits.username, pathname, properties.plan). " +
         "Filters by event_name and optional property filters, then groups remaining events. " +
         "Returns `{ groups: [{key, count, first_seen, last_seen, sessions, extras}], scanned, hitCount, hasMore }`. " +
         "When `hasMore: true`, the scan stopped at maxScan before the start of the range: narrow the time window or raise `maxScan`. " +
@@ -302,8 +302,8 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           .min(1)
           .describe(
             "One or more group keys. Built-in: 'identified_user_id', 'user_id', 'pathname', 'hostname', " +
-              "'country', 'browser', 'device_type', 'traits.username', 'traits.sex'. " +
-              "Use 'properties.<name>' to group by an event property (e.g. 'properties.room_id')."
+              "'country', 'browser', 'device_type', 'traits.username', 'traits.plan'. " +
+              "Use 'properties.<name>' to group by an event property (e.g. 'properties.plan')."
           ),
         propertyFilters: z
           .array(
