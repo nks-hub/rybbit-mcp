@@ -228,9 +228,10 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           (f) => f.parameter !== "event_name"
         );
         const hadEventFilter = safeFilters?.length !== args.filters?.length;
-        const safeArgs = { ...args, filters: safeFilters };
+        const { limit, ...rest } = args;
 
-        const params = client.buildAnalyticsParams(safeArgs);
+        const params = client.buildAnalyticsParams({ ...rest, filters: safeFilters });
+        if (limit !== undefined) params.page_size = limit;
         if (args.search) params.search = args.search;
         if (args.searchField) params.search_field = args.searchField;
         if (args.identifiedOnly) params.identified_only = "true";

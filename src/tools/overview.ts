@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, unwrapRows } from "../client.js";
+import { RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
@@ -58,12 +58,12 @@ const sessionLocationsOutput = {
           lon: z.number().optional(),
           city: z.string().optional(),
           country: z.string().optional(),
-          sessions: z.number().optional(),
+          count: z.number().optional().describe("Sessions at this location"),
         })
         .passthrough()
     )
-    .optional()
-    .describe("Geographic session locations"),
+    .describe("Session locations, busiest first"),
+  totalCount: z.number().optional().describe("Locations in the range, across all pages"),
 };
 
 export function registerOverviewTools(
@@ -228,7 +228,8 @@ export function registerOverviewTools(
     {
       title: "Session Locations",
       description:
-        "Get geographic session location data with coordinates. Returns latitude, longitude, city, country, and session count for map visualization and geographic analysis.",
+        "Get geographic session location data with coordinates. Returns latitude, longitude, city, country, and session count, busiest location first. " +
+        "Returns 100 locations per page by default; `totalCount` says how many there are.",
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
@@ -247,16 +248,18 @@ export function registerOverviewTools(
     },
     async (args) => {
       try {
-        const params = client.buildAnalyticsParams(args);
+        const { page, limit, ...rest } = args;
+        const params = client.buildAnalyticsParams(rest);
 
         const data = await client.get(
           `/sites/${args.siteId}/sessions/locations`,
           params
         );
 
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
+        // The endpoint returns every location and has no limit parameter.
+        const rows = unwrapRows(data).rows.sort((a, b) => Number(b.count) - Number(a.count));
 
-        return jsonResult(wrapped);
+        return jsonResult(pageRows(rows, page ?? 1, limit ?? 100));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

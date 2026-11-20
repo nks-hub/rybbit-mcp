@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient } from "../client.js";
+import { RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
@@ -128,11 +128,13 @@ const outboundLinksOutput = {
       z
         .object({
           url: z.string().optional(),
-          clicks: z.number().optional(),
+          count: z.number().optional(),
+          lastClicked: z.string().optional(),
         })
         .passthrough()
     )
-    .optional(),
+    .describe("Outbound links, most clicked first"),
+  totalCount: z.number().optional().describe("Links in the range, across all pages (the server reports at most 1000)"),
 };
 
 export function registerEventsTools(server: McpServer, client: RybbitClient): void {
@@ -169,7 +171,9 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     },
     async (args) => {
       try {
-        const params = client.buildAnalyticsParams(args) as Record<string, unknown>;
+        const { limit, ...rest } = args;
+        const params = client.buildAnalyticsParams(rest) as Record<string, unknown>;
+        if (limit !== undefined) params.page_size = limit;
         // Pass cursor through to backend if it accepts them; harmless if it
         // ignores unknown query params.
         if (args.beforeTimestamp) params.beforeTimestamp = args.beforeTimestamp;
@@ -668,7 +672,8 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "Outbound Links",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Get outbound link clicks tracked on the site. Shows which external URLs users are clicking and how often.",
+        "Get outbound link clicks tracked on the site. Shows which external URLs users are clicking and how often, most clicked first. " +
+        "Returns 100 links per page by default; `totalCount` says how many there are.",
       inputSchema: {
         ...analyticsInputSchema,
         ...paginationSchema,
@@ -681,10 +686,12 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     },
     async (args) => {
       try {
-        const params = client.buildAnalyticsParams(args);
+        const { page, limit, ...rest } = args;
+        const params = client.buildAnalyticsParams(rest);
         const data = await client.get(`/sites/${args.siteId}/events/outbound`, params);
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return jsonResult(wrapped);
+        // The endpoint returns up to 1000 links and has no limit parameter.
+        const rows = unwrapRows(data).rows.sort((a, b) => Number(b.count) - Number(a.count));
+        return jsonResult(pageRows(rows, page ?? 1, limit ?? 100));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

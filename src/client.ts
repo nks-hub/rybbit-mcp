@@ -186,3 +186,15 @@ export function unwrapRows(raw: unknown): {
     totalCount,
   };
 }
+
+/**
+ * Pages rows in memory, for endpoints that return every row whatever limit is sent.
+ */
+export function pageRows<T>(
+  rows: T[],
+  page: number,
+  limit: number
+): { data: T[]; totalCount: number } {
+  const start = (page - 1) * limit;
+  return { data: rows.slice(start, start + limit), totalCount: rows.length };
+}
