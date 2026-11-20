@@ -49,7 +49,7 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
             },
         ],
         valueHint: "Discover via rybbit_get_event_names (returns all event_names + counts).",
-        examples: ["pm_sent", "chat_v2_message_sent", "ad_click", "server_error"],
+        examples: ["signup", "message_sent", "ad_click", "server_error"],
     },
     user_id: {
         parameter: "user_id",
@@ -63,7 +63,7 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
         ],
         strippedIn: [],
         valueHint: "Rybbit device hash (12 hex chars) OR identified_user_id (app's user_id string).",
-        examples: ["f07f06c797cc", "138170"],
+        examples: ["a1b2c3d4e5f6", "12345"],
     },
     pathname: {
         parameter: "pathname",
@@ -80,7 +80,7 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
         ],
         strippedIn: [],
         valueHint: "Starts with '/', no querystring. Use regex type for path patterns.",
-        examples: ["/novy", "/room/41271", "/api/v1/health"],
+        examples: ["/pricing", "/blog/hello-world", "/api/v1/health"],
     },
     hostname: {
         parameter: "hostname",
@@ -88,7 +88,7 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
         supportedIn: ["all analytics endpoints"],
         strippedIn: [],
         valueHint: "Bare hostname without scheme.",
-        examples: ["chatujme.cz", "vzkazy.chatujme.cz", "diskuze.chatujme.cz"],
+        examples: ["example.com", "blog.example.com", "shop.example.com"],
     },
     country: {
         parameter: "country",
@@ -128,7 +128,7 @@ const DIMENSIONS: Record<string, DimensionInfo> = {
         supportedIn: ["all analytics endpoints"],
         strippedIn: [],
         valueHint: "Full URL with scheme. Empty string for direct visits. Use `contains` for domain matching.",
-        examples: ["https://login.chatujme.cz/", "https://google.com/"],
+        examples: ["https://login.example.com/", "https://google.com/"],
     },
     utm_source: {
         parameter: "utm_source",
