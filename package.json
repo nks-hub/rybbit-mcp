@@ -18,6 +18,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "npm run build && node --test test/*.test.mjs",
     "start": "node build/index.js",
     "start:http": "cross-env MCP_TRANSPORT=http node build/index.js"
   },

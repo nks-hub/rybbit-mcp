@@ -472,7 +472,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
 
         const params: QueryParams = {
           ...client.buildAnalyticsParams(rest),
-          userId,
+          user_id: userId,
         };
 
         const data = await client.get(

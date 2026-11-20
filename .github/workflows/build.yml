@@ -19,6 +19,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx tsc --noEmit
+      - run: node --test test/*.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: build
