@@ -6,7 +6,7 @@
   "main": "build/server.js",
   "types": "build/server.d.ts",
   "bin": {
-    "rybbit-mcp": "./build/index.js"
+    "rybbit-mcp": "build/index.js"
   },
   "exports": {
     ".": {
