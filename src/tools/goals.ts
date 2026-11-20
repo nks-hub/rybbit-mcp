@@ -75,6 +75,13 @@ export function registerGoalsTools(
           .optional()
           .describe("Minutes ago end"),
         ...paginationSchema(25),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(25)
+          .describe("Rows per page; the server maximum is 100"),
       },
       outputSchema: output(listGoalsOutput),
       _meta: {
@@ -88,8 +95,8 @@ export function registerGoalsTools(
 
         const params = client.buildAnalyticsParams(rest);
         params.page = page;
-        // The goals endpoint pages 10 at a time by default and takes at most 100.
-        params.page_size = Math.min(limit, 100);
+        // The goals endpoint pages 10 at a time by default.
+        params.page_size = limit;
 
         const data = await client.get<{ meta?: { total?: number } }>(
           `/sites/${siteId}/goals`,

@@ -86,8 +86,17 @@ test("list_goals asks for its own page size and reports the total", async () => 
     assert.equal(mcp.requests[0].query.page_size, "25");
     assert.equal(res.structuredContent.totalCount, 1);
 
-    await mcp.call("rybbit_list_goals", { siteId: 1, limit: 200 });
+    await mcp.call("rybbit_list_goals", { siteId: 1, limit: 100, page: 2 });
     assert.equal(mcp.requests[1].query.page_size, "100");
+    assert.equal(mcp.requests[1].query.page, "2");
+
+    // Above the server maximum the pages would no longer line up with the limit asked for.
+    const tooMany = await mcp
+      .call("rybbit_list_goals", { siteId: 1, limit: 101 })
+      .catch((err) => ({ isError: true, text: err.message }));
+    assert.equal(tooMany.isError, true);
+    assert.match(tooMany.text, /limit/);
+    assert.equal(mcp.requests.length, 2);
   } finally {
     await mcp.close();
   }
