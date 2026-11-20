@@ -11,7 +11,7 @@ description: "MCP server for Rybbit Analytics — privacy-first, open-source web
 
 This MCP server exposes **43 tools** that let Claude query any Rybbit Analytics instance directly — no dashboard needed. Claude can retrieve traffic overviews, drill into sessions and users, analyze funnels and goals, investigate errors, audit Core Web Vitals performance, track custom events, and manage sites.
 
-**Package**: `@nks-hub/rybbit-mcp` v0.5.2
+**Package**: `@nks-hub/rybbit-mcp`
 **Stack**: TypeScript, `@modelcontextprotocol/sdk` v1.27+, Zod, Node.js 18+
 **Transport**: StdioServerTransport (local, for Claude Code)
 
@@ -177,6 +177,19 @@ Permanently delete a site and its replay data.
 
 ---
 
+#### `rybbit_site_has_data`
+Check whether a site has received any tracking events yet.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+
+**Returns**: `{ hasData }`
+
+**Use case**: Verify that the tracking snippet or SDK sends data before querying analytics.
+
+---
+
 ### 4.2 Real-time & Overview
 
 #### `rybbit_live_users`
@@ -284,6 +297,27 @@ Get metric breakdown by dimension.
 
 ---
 
+#### `rybbit_get_page_titles`
+Get the most-viewed page titles with their paths.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `startDate` | string | No | Start date `YYYY-MM-DD` |
+| `endDate` | string | No | End date `YYYY-MM-DD` |
+| `timeZone` | string | No | IANA timezone |
+| `filters` | array | No | Filter array |
+| `pastMinutesStart` | number | No | Minutes ago start |
+| `pastMinutesEnd` | number | No | Minutes ago end |
+| `page` | number | No | Page number (default: 1) |
+| `limit` | number | No | Results per page (default 20, max 200) |
+
+**Returns**: `{ data: [{ value, pathname, count, percentage, pageviews, bounce_rate, time_on_page_seconds }], totalCount }`. `value` is the page title, `count` the number of sessions.
+
+**Use case**: Top pages by title. `rybbit_get_metric` with `parameter="pathname"` reports the same pages by path.
+
+---
+
 #### `rybbit_get_retention`
 Get user retention cohort analysis.
 
@@ -300,6 +334,19 @@ Get user retention cohort analysis.
 **Returns**: Array of `{ cohort, periods[] }` showing return rates per cohort.
 
 **Use case**: How many users come back over time — retention analysis by cohort.
+
+---
+
+#### `rybbit_describe_dimension`
+Look up which tools accept a filter dimension and what values it takes.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `parameter` | string | Yes | Dimension name, case-sensitive (e.g., `event_name`, `pathname`, `url_param:ref`) |
+
+**Returns**: `{ parameter, description, supportedIn[], strippedIn: [{ tool, reason }], valueHint, examples[] }`. For a name that is not a filter dimension, `knownDimensions` lists all 31.
+
+**Use case**: Check before building a `filters` array whether a tool accepts the dimension or drops it.
 
 ---
 
@@ -418,7 +465,26 @@ Get event count breakdown for a specific user.
 
 **Returns**: Event names with counts for the specified user.
 
-**Use case**: Per-user behavior analysis — how many `ad_click`, `chat_message_sent`, `purchase` events a user triggered.
+**Use case**: Per-user behavior analysis — how many `ad_click`, `signup`, `purchase` events a user triggered.
+
+---
+
+#### `rybbit_get_user_session_count`
+Get the number of sessions per day for one user.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `userId` | string | Yes | User ID: `identified_user_id` or the device hash `user_id` |
+| `startDate` | string | No | Start date `YYYY-MM-DD` |
+| `endDate` | string | No | End date `YYYY-MM-DD` |
+| `timeZone` | string | No | IANA timezone |
+| `pastMinutesStart` | number | No | Minutes ago start |
+| `pastMinutesEnd` | number | No | Minutes ago end |
+
+**Returns**: `{ data: [{ date, sessions }] }`, one row per day.
+
+**Use case**: Plot how active a single user was over a period.
 
 ---
 
@@ -525,6 +591,53 @@ Get outbound link clicks tracked on the site.
 **Returns**: `{ data: [{ url, count, lastClicked }], totalCount }`, most clicked first, 100 per page. The server reports at most 1000 links.
 
 **Use case**: Which external links are users clicking? Are affiliate links performing?
+
+---
+
+#### `rybbit_get_event_aggregate`
+Count events grouped by one or more fields. The server has no grouping endpoint, so the tool reads raw events and groups them itself.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `groupBy` | array | Yes | Group keys: `identified_user_id`, `user_id`, `pathname`, `hostname`, `country`, `browser`, `device_type`, `traits.<name>`, `properties.<name>` |
+| `eventName` | string | No | Only this event name |
+| `propertyFilters` | array | No | `[{ key, operator, value? }]` on event properties; `operator` is `equals`, `not_equals`, `exists` or `not_exists` |
+| `maxScan` | number | No | Events to read, newest first (100 to 50000, default 5000) |
+| `topN` | number | No | Groups to return (1 to 500, default 50) |
+| `startDate` | string | No | Start date `YYYY-MM-DD` |
+| `endDate` | string | No | End date `YYYY-MM-DD` |
+| `timeZone` | string | No | IANA timezone |
+| `filters` | array | No | Filter array |
+| `pastMinutesStart` | number | No | Minutes ago start |
+| `pastMinutesEnd` | number | No | Minutes ago end |
+
+**Returns**: `{ groups: [{ key, count, sessions, first_seen, last_seen, extras }], scanned, hitCount, hasMore, windowStart, windowEnd }`, largest group first. `hasMore: true` means the scan stopped at `maxScan` before the start of the range.
+
+**Use case**: Count `signup` events per `properties.plan`, or events per page and country.
+
+---
+
+#### `rybbit_get_event_user_leaderboard`
+Rank users by how often they triggered one event.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `eventName` | string | Yes | Event name to rank users by |
+| `topN` | number | No | Users to return (1 to 200, default 25) |
+| `maxScan` | number | No | Events to read, newest first (100 to 50000, default 5000) |
+| `identifiedOnly` | boolean | No | Rank only users with an `identified_user_id` (default: true). Set `false` on sites that do not identify users. |
+| `startDate` | string | No | Start date `YYYY-MM-DD` |
+| `endDate` | string | No | End date `YYYY-MM-DD` |
+| `timeZone` | string | No | IANA timezone |
+| `filters` | array | No | Filter array |
+| `pastMinutesStart` | number | No | Minutes ago start |
+| `pastMinutesEnd` | number | No | Minutes ago end |
+
+**Returns**: The same shape as `rybbit_get_event_aggregate`. `key` is the user ID and `extras` holds `{ identified_user_id, user_id, username }`. `note` says how many events from anonymous visitors were left out.
+
+**Use case**: Who triggered `signup` or `ad_click` most often this week?
 
 ---
 
@@ -681,6 +794,36 @@ Get sessions that reached or dropped off at a specific funnel step.
 
 ---
 
+#### `rybbit_create_funnel`
+Save a named funnel, or overwrite an existing one.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `name` | string | Yes | Funnel display name |
+| `steps` | array | Yes | Minimum 2 steps, in order. Each: `{ value: string, type: "page"\|"event", name?: string }` |
+| `reportId` | number | No | ID of an existing funnel to overwrite instead of creating a new one |
+
+**Returns**: `{ success, funnelId }`
+
+**Use case**: Keep a funnel so that `rybbit_list_funnels` returns it later.
+
+---
+
+#### `rybbit_delete_funnel`
+Permanently delete a saved funnel.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `funnelId` | string/number | Yes | Funnel ID (from `rybbit_list_funnels`) |
+
+**Returns**: `{ success }`
+
+**Use case**: Remove a funnel that is no longer needed. **Destructive** — cannot be undone.
+
+---
+
 ### 4.10 Goals
 
 #### `rybbit_list_goals`
@@ -724,6 +867,53 @@ Get sessions that completed a specific goal.
 
 ---
 
+#### `rybbit_create_goal`
+Create a conversion goal that matches a URL path or a custom event.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `goalType` | string | Yes | `path` (URL pattern) or `event` (custom event) |
+| `config` | object | Yes | `pathPattern` for path goals (wildcards such as `/products/*`), `eventName` for event goals. Event goals can also match properties: the pair `eventPropertyKey` + `eventPropertyValue`, or `propertyFilters: [{ key, value }]`. |
+| `name` | string | No | Display name |
+
+**Returns**: `{ success, goalId }`
+
+**Use case**: Start measuring conversions for a page visit or an event such as `signup`.
+
+---
+
+#### `rybbit_update_goal`
+Change the name, type or configuration of a goal.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `goalId` | number | Yes | Goal ID (from `rybbit_list_goals`) |
+| `goalType` | string | Yes | `path` or `event` |
+| `config` | object | Yes | Same fields as in `rybbit_create_goal` |
+| `name` | string | No | Display name |
+
+**Returns**: `{ success, goalId }`
+
+**Use case**: Fix a path pattern or point a goal at a different event.
+
+---
+
+#### `rybbit_delete_goal`
+Permanently delete a goal.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `siteId` | string/number | Yes | Site ID |
+| `goalId` | number | Yes | Goal ID (from `rybbit_list_goals`) |
+
+**Returns**: `{ success }`
+
+**Use case**: Remove a goal that is no longer needed. **Destructive** — cannot be undone.
+
+---
+
 ### 4.11 Journeys
 
 #### `rybbit_get_journeys`
@@ -763,7 +953,9 @@ Filters are the most powerful feature — they narrow results by any dimension.
 
 Filters are passed as an array. Multiple filters use AND logic.
 
-### Filter Dimensions (22 total)
+### Filter Dimensions (31 total)
+
+The table covers the 22 most used. The server also accepts `browser_version`, `operating_system_version`, `device_model` and `app_version` (both filled only for mobile-type sites tracked via the SDK), `dimensions`, `lat`, `lon`, `timezone` and `tag`. `rybbit_describe_dimension` describes any of them.
 
 | Dimension | Description | Example values |
 |-----------|-------------|----------------|
