@@ -3,6 +3,7 @@
  */
 
 import { z } from "zod";
+import { MAX_PAGE_SIZE } from "./constants.js";
 
 export const siteIdSchema = z
   .union([z.string(), z.number()])
@@ -128,16 +129,17 @@ export const bucketSchema = z
   .default("day")
   .describe("Time bucket granularity. Use 'hour' for a single day, 'week'/'month' for long ranges");
 
-export const paginationSchema = {
-  page: z.number().int().min(1).optional().describe("Page number, 1-indexed (default: 1)"),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(200)
-    .optional()
-    .describe("Results per page (default: 20-50 depending on endpoint, max 200)"),
-};
+/**
+ * Row limit with a per-tool default. Defaults are sized so that one page of the
+ * tool's rows stays near 10 000 characters of JSON.
+ */
+export const limitSchema = (defaultLimit: number) =>
+  z.number().int().min(1).max(MAX_PAGE_SIZE).default(defaultLimit).describe("Rows per page");
+
+export const paginationSchema = (defaultLimit: number) => ({
+  page: z.number().int().min(1).default(1).describe("Page number, 1-indexed"),
+  limit: limitSchema(defaultLimit),
+});
 
 export const metricParameterSchema = z
   .enum([

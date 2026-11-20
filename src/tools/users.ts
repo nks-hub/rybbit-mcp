@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { FilterParam, QueryParams, RybbitClient } from "../client.js";
 import { jsonResult, output } from "../response.js";
-import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
+import { analyticsInputSchema, limitSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface SessionRow {
   identified_user_id: string;
@@ -41,7 +41,19 @@ const listUsersOutput = {
 };
 
 const userDetailOutput = {
-  data: z.unknown().optional().describe("User detail payload"),
+  user_id: z.string().nullish().describe("Device hash"),
+  identified_user_id: z.string().nullish(),
+  sessions: z.number().nullish(),
+  pageviews: z.number().nullish(),
+  events: z.number().nullish(),
+  duration: z.number().nullish().describe("Total session time in seconds"),
+  first_seen: z.string().nullish(),
+  last_seen: z.string().nullish(),
+  traits: z.record(z.unknown()).nullish(),
+  linked_devices: z
+    .array(z.record(z.unknown()))
+    .optional()
+    .describe("Anonymous device ids merged into this user"),
 };
 
 const userTraitsOutput = {
@@ -107,7 +119,7 @@ async function fetchUsersByDuration(
     pastMinutesStart?: number;
     pastMinutesEnd?: number;
     sortOrder?: string;
-    limit?: number;
+    limit: number;
   }
 ): Promise<{ data: AggregatedUser[] }> {
   // Fetch sessions in batches to aggregate duration per user
@@ -167,8 +179,7 @@ async function fetchUsersByDuration(
       : b.total_duration - a.total_duration
   );
 
-  const limit = args.limit ?? 20;
-  return { data: sorted.slice(0, limit) };
+  return { data: sorted.slice(0, args.limit) };
 }
 
 export function registerUsersTools(server: McpServer, client: RybbitClient): void {
@@ -185,7 +196,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         "Call `rybbit_describe_dimension` to see capability per filter dimension.",
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        ...paginationSchema(15),
         search: z
           .string()
           .optional()
@@ -239,7 +250,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
         const { limit, ...rest } = args;
 
         const params = client.buildAnalyticsParams({ ...rest, filters: safeFilters });
-        if (limit !== undefined) params.page_size = limit;
+        params.page_size = limit;
         if (args.search) params.search = args.search;
         if (args.searchField) params.search_field = args.searchField;
         if (args.identifiedOnly) params.identified_only = "true";
@@ -275,7 +286,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
       title: "User Detail",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Get detailed information about a specific user including their traits, session history, and activity summary.",
+        "Get one user: traits, totals (sessions, pageviews, events, duration), first/last seen, first and last traffic source, plus their locations, devices and linked anonymous devices.",
       inputSchema: {
         siteId: siteIdSchema,
         userId: z.string().describe("User ID (identified_user_id or internal user ID)"),
@@ -288,11 +299,11 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
     },
     async (args) => {
       try {
-        const data = await client.get(`/sites/${args.siteId}/users/${args.userId}`);
-        const wrapped = (data && typeof data === "object" && !Array.isArray(data))
-          ? (data as Record<string, unknown>)
-          : { data };
-        return jsonResult(wrapped);
+        const raw = await client.get<{ data?: Record<string, unknown> }>(
+          `/sites/${args.siteId}/users/${args.userId}`
+        );
+        // Top level, so an oversized linked_devices list can be shortened on its own.
+        return jsonResult(raw?.data ?? raw);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -326,7 +337,7 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           .string()
           .optional()
           .describe("Trait value (required for 'users' mode)"),
-        limit: z.number().optional().describe("Max results to return"),
+        limit: limitSchema(25).describe("Max values or users to return; `total` says how many match"),
       },
       outputSchema: output(userTraitsOutput),
       _meta: {
@@ -355,11 +366,10 @@ export function registerUsersTools(server: McpServer, client: RybbitClient): voi
           const params: Record<string, string | number> = {};
           if (args.key !== undefined) params.key = args.key;
           if (resolvedValue !== undefined) params.value = resolvedValue;
-          if (args.limit !== undefined) params.limit = args.limit;
+          params.limit = args.limit;
           data = await client.get(`/sites/${args.siteId}/user-traits/users`, params);
         } else if (resolvedMode === "values" && args.key !== undefined) {
-          const params: Record<string, string | number> = { key: args.key };
-          if (args.limit !== undefined) params.limit = args.limit;
+          const params: Record<string, string | number> = { key: args.key, limit: args.limit };
           data = await client.get(`/sites/${args.siteId}/user-traits/values`, params);
         } else {
           data = await client.get(`/sites/${args.siteId}/user-traits/keys`);

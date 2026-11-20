@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { RybbitClient, unwrapRows } from "../client.js";
+import { RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
 import {
   analyticsInputSchema,
+  limitSchema,
   paginationSchema,
   siteIdSchema,
 } from "../schemas.js";
@@ -28,6 +29,7 @@ const sessionSummaryShape = z
 
 const listSessionsOutput = {
   data: z.array(sessionSummaryShape).optional().describe("Sessions"),
+  totalCount: z.number().optional().describe("Sessions matching the ip filter, across all pages"),
   filteredBy: z.string().optional().describe("Client-side filter applied (e.g. ip=...)"),
   scannedPages: z.number().optional().describe("Pages scanned when filtering client-side"),
 };
@@ -77,7 +79,7 @@ export function registerSessionsTools(
       },
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        ...paginationSchema(10),
         ip: z
           .string()
           .optional()
@@ -101,8 +103,8 @@ export function registerSessionsTools(
       try {
         const { siteId, page, limit, ip, identifiedOnly, minDuration, ...rest } = args as {
           siteId: string;
-          page?: number;
-          limit?: number;
+          page: number;
+          limit: number;
           ip?: string;
           identifiedOnly?: boolean;
           minDuration?: number;
@@ -145,13 +147,11 @@ export function registerSessionsTools(
             fetchPage++;
           }
 
-          const filteredResult = {
-            data: allSessions,
+          return jsonResult({
+            ...pageRows(allSessions, page, limit),
             filteredBy: `ip=${ip}`,
             scannedPages: fetchPage,
-          };
-
-          return jsonResult(filteredResult);
+          });
         }
 
         const data = await client.get<unknown>(`/sites/${siteId}/sessions`, params);
@@ -172,7 +172,7 @@ export function registerSessionsTools(
     {
       title: "Session Detail",
       description:
-        "Get one session: `session` (device, location, counters) and `events`, its timeline of page views and events, oldest first. Use rybbit_list_sessions first to find session IDs.",
+        "Get one session: `session` (device, location, counters) and `events`, its timeline of page views and events, oldest first, 25 per call (page with offset). Use rybbit_list_sessions first to find session IDs.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -182,6 +182,8 @@ export function registerSessionsTools(
       inputSchema: {
         siteId: siteIdSchema,
         sessionId: z.string().describe("Session ID to retrieve"),
+        limit: limitSchema(25).describe("Events per call; `pagination.total` says how many the session has"),
+        offset: z.number().int().min(0).default(0).describe("Events to skip, for paging through a long session"),
       },
       outputSchema: output(sessionDetailOutput),
       _meta: {
@@ -191,13 +193,11 @@ export function registerSessionsTools(
     },
     async (args) => {
       try {
-        const { siteId, sessionId } = args as {
-          siteId: string;
-          sessionId: string;
-        };
+        const { siteId, sessionId, limit, offset } = args;
 
         const raw = await client.get<{ data?: Record<string, unknown> }>(
-          `/sites/${siteId}/sessions/${sessionId}`
+          `/sites/${siteId}/sessions/${sessionId}`,
+          { limit, offset }
         );
 
         return jsonResult(raw?.data ?? raw);

@@ -222,7 +222,7 @@ export function registerOverviewTools(
         "Returns 100 locations per page by default; `totalCount` says how many there are.",
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        ...paginationSchema(100),
       },
       outputSchema: output(sessionLocationsOutput),
       _meta: {
@@ -249,7 +249,7 @@ export function registerOverviewTools(
         // The endpoint returns every location and has no limit parameter.
         const rows = unwrapRows(data).rows.sort((a, b) => Number(b.count) - Number(a.count));
 
-        return jsonResult(pageRows(rows, page ?? 1, limit ?? 100));
+        return jsonResult(pageRows(rows, page, limit));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

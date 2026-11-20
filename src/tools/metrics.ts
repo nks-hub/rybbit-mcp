@@ -52,7 +52,7 @@ export function registerMetricsTools(
     {
       title: "Metric Breakdown",
       description:
-        "Get metric breakdown by dimension. Use parameter='pathname' for top pages, 'browser'/'operating_system'/'device_type' for tech stats, 'country'/'city' for geo, 'utm_source'/'utm_campaign' for marketing, 'referrer'/'channel' for traffic sources, 'entry_page'/'exit_page' for user flow. Returns rows sorted by sessions with count, percentage, pageviews and bounce_rate.",
+        "Get metric breakdown by dimension. Use parameter='pathname' for top pages, 'browser'/'operating_system'/'device_type' for tech stats, 'country'/'city' for geo, 'utm_source'/'utm_campaign' for marketing, 'referrer'/'channel' for traffic sources, 'entry_page'/'exit_page' for user flow. Returns rows sorted by sessions with count, percentage, pageviews and bounce_rate, 50 per page; `totalCount` says how many values there are.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -62,7 +62,7 @@ export function registerMetricsTools(
       inputSchema: {
         ...analyticsInputSchema,
         parameter: metricParameterSchema,
-        ...paginationSchema,
+        ...paginationSchema(50),
       },
       outputSchema: output(metricOutput),
       _meta: {

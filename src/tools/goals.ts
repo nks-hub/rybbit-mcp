@@ -19,6 +19,7 @@ const goalShape = z
 
 const listGoalsOutput = {
   data: z.array(goalShape).describe("Goals with conversion metrics"),
+  totalCount: z.number().optional().describe("Goals on the site, across all pages"),
 };
 
 const goalSessionsOutput = {
@@ -40,7 +41,7 @@ export function registerGoalsTools(
     {
       title: "List Goals",
       description:
-        "List all goals for a site with their current conversion metrics and configuration.",
+        "List the goals of a site with their conversion metrics and configuration, 25 per page (the server allows at most 100); `totalCount` says how many there are.",
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
@@ -73,6 +74,7 @@ export function registerGoalsTools(
           .number()
           .optional()
           .describe("Minutes ago end"),
+        ...paginationSchema(25),
       },
       outputSchema: output(listGoalsOutput),
       _meta: {
@@ -82,29 +84,18 @@ export function registerGoalsTools(
     },
     async (args) => {
       try {
-        const { siteId, ...rest } = args as {
-          siteId: string;
-          startDate?: string;
-          endDate?: string;
-          timeZone?: string;
-          filters?: Array<{
-            parameter: string;
-            type: string;
-            value: (string | number)[];
-          }>;
-          pastMinutesStart?: number;
-          pastMinutesEnd?: number;
-        };
+        const { siteId, page, limit, ...rest } = args;
 
         const params = client.buildAnalyticsParams(rest);
+        params.page = page;
+        // The goals endpoint pages 10 at a time by default and takes at most 100.
+        params.page_size = Math.min(limit, 100);
 
-        const data = await client.get<unknown>(
+        const data = await client.get<{ meta?: { total?: number } }>(
           `/sites/${siteId}/goals`,
           params
         );
-        const { rows, totalCount } = unwrapRows(data);
-        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
-        return jsonResult(wrapped);
+        return jsonResult({ data: unwrapRows(data).rows, totalCount: data?.meta?.total });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -156,7 +147,7 @@ export function registerGoalsTools(
           .number()
           .optional()
           .describe("Minutes ago end"),
-        ...paginationSchema,
+        ...paginationSchema(10),
       },
       outputSchema: output(goalSessionsOutput),
       _meta: {

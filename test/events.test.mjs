@@ -118,6 +118,7 @@ test("list_events maps cursors and the event name to backend parameters", async 
     assert.equal(page.structuredContent.data[0].event_cursor, "c5");
     assert.equal(page.structuredContent.cursor.oldestCursor, "c14");
     assert.deepEqual(page.structuredContent.data[0].properties_parsed, { plan: "free" });
+    assert.equal(page.structuredContent.data[0].properties, undefined);
 
     await mcp.call("rybbit_list_events", { siteId: 1, beforeTimestamp: "2026-01-05 10:00:00" });
     assert.equal(mcp.requests[1].query.before_timestamp, "2026-01-05 10:00:00");

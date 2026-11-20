@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
-import { analyticsInputSchema, bucketSchema } from "../schemas.js";
+import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
 
 const dimensionSchema = z
   .enum(["overview", "pathname", "browser", "operating_system"])
@@ -64,6 +64,7 @@ export function registerPerformanceTools(
       inputSchema: {
         ...analyticsInputSchema,
         dimension: dimensionSchema,
+        ...paginationSchema(50),
       },
       outputSchema: output(performanceOutput),
       _meta: {
@@ -73,9 +74,11 @@ export function registerPerformanceTools(
     },
     async (args) => {
       try {
-        const { siteId, dimension, ...rest } = args as {
+        const { siteId, dimension, page, limit, ...rest } = args as {
           siteId: string;
           dimension?: "overview" | "pathname" | "browser" | "operating_system";
+          page: number;
+          limit: number;
           startDate?: string;
           endDate?: string;
           timeZone?: string;
@@ -96,6 +99,8 @@ export function registerPerformanceTools(
           dimension === "operating_system"
         ) {
           params.dimension = dimension;
+          params.page = page;
+          params.limit = limit;
           const data = await client.get<unknown>(
             `/sites/${siteId}/performance/by-dimension`,
             params

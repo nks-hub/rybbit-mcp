@@ -62,7 +62,7 @@ export function fitToLimit(
     };
   }
 
-  const cut = `Showing ${keep} of the ${rows.length} rows in '${key}' because the full response would exceed ${limit} characters. Request fewer rows per call (limit) and page through the rest.`;
+  const cut = `Showing ${keep} of the ${rows.length} rows in '${key}' because the full response would exceed ${limit} characters. Narrow the request to get the rest: a smaller limit and the next page, a shorter date range, a coarser bucket or filters.`;
   return {
     ...payload,
     [key]: rows.slice(0, keep),

@@ -54,7 +54,7 @@ export function registerErrorsTools(
       },
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        ...paginationSchema(10),
         type: z
           .enum(["names", "events", "timeseries"])
           .optional()
@@ -98,7 +98,9 @@ export function registerErrorsTools(
           pastMinutesEnd?: number;
         };
 
-        const params = client.buildAnalyticsParams({ ...rest, page, limit, bucket });
+        const params = client.buildAnalyticsParams(
+          type === "timeseries" ? { ...rest, bucket } : { ...rest, page, limit }
+        );
 
         if (type === "timeseries") {
           if (!errorMessage) {

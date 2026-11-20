@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { RybbitClient, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
-import { analyticsInputSchema, bucketSchema, siteIdSchema } from "../schemas.js";
+import { analyticsInputSchema, paginationSchema, siteIdSchema } from "../schemas.js";
 
 interface VersionResponse {
   version: string;
@@ -54,6 +54,7 @@ const listSitesOutput = {
         .passthrough()
     )
     .describe("Organizations with nested sites"),
+  totalCount: z.number().optional().describe("Number of sites across all organizations"),
 };
 
 const createSiteOutput = {
@@ -110,6 +111,7 @@ const pageTitlesOutput = {
         .passthrough()
     )
     .optional(),
+  totalCount: z.number().optional().describe("Page titles in the range, across all pages"),
 };
 
 export function registerConfigTools(
@@ -163,7 +165,7 @@ export function registerConfigTools(
     {
       title: "List Sites",
       description:
-        "List all sites and organizations the authenticated user has access to",
+        "List the organizations and sites the authenticated user has access to. Each site has the `id` to pass as siteId, its domain, name and privacy switches. To find one site on a large account use rybbit_get_site_id.",
       inputSchema: {},
       outputSchema: output(listSitesOutput),
       _meta: {
@@ -179,11 +181,25 @@ export function registerConfigTools(
     },
     async () => {
       try {
-        const data = await client.get<Organization[]>("/organizations");
-        const { rows, totalCount } = unwrapRows(data);
-        const wrapped = { data: rows, ...(totalCount !== undefined ? { totalCount } : {}) };
+        const orgs = unwrapRows(await client.get<Organization[]>("/organizations")).rows as Organization[];
 
-        return jsonResult(wrapped);
+        // Keep what identifies a site and its privacy switches; the rest
+        // (owner ids, timestamps, slugs) triples the payload on large accounts.
+        const data = orgs.map((org) => ({
+          id: org.id,
+          name: org.name,
+          role: org.role,
+          sites: (org.sites ?? []).map((site) => ({
+            id: site.id,
+            domain: site.domain,
+            name: site.name,
+            public: site.public,
+            blockBots: site.blockBots,
+            saltUserIds: site.saltUserIds,
+          })),
+        }));
+
+        return jsonResult({ data, totalCount: data.reduce((n, org) => n + org.sites.length, 0) });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -559,6 +575,7 @@ export function registerConfigTools(
         "Get the most-viewed page titles for a site, broken down by pageviews and unique sessions. Complements rybbit_get_metric with parameter='pathname' by giving the human-readable page title instead of just the path.",
       inputSchema: {
         ...analyticsInputSchema,
+        ...paginationSchema(20),
       },
       outputSchema: output(pageTitlesOutput),
       _meta: {
@@ -574,15 +591,8 @@ export function registerConfigTools(
     },
     async (args) => {
       try {
-        const { siteId, ...rest } = args as {
-          siteId: string;
-          startDate?: string;
-          endDate?: string;
-          timeZone?: string;
-          filters?: Array<{ parameter: string; type: string; value: (string | number)[] }>;
-          pastMinutesStart?: number;
-          pastMinutesEnd?: number;
-        };
+        const { siteId, ...rest } = args;
+        // page and limit go through as is; with a page the server also reports totalCount.
         const params = client.buildAnalyticsParams(rest);
         const data = await client.get(`/sites/${siteId}/page-titles`, params);
         const { rows, totalCount } = unwrapRows(data);

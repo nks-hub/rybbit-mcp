@@ -268,7 +268,7 @@ export function registerFunnelsTools(
           )
           .min(2)
           .describe("The funnel steps definition (same as used in rybbit_analyze_funnel)"),
-        ...paginationSchema,
+        ...paginationSchema(10),
       },
       outputSchema: output(funnelStepSessionsOutput),
       _meta: {
@@ -297,7 +297,7 @@ export function registerFunnelsTools(
           limit?: number;
         };
 
-        const params = client.buildAnalyticsParams({ ...rest, page: rest.page ?? 1 });
+        const params = client.buildAnalyticsParams(rest);
         params.mode = mode;
 
         const data = await client.post(

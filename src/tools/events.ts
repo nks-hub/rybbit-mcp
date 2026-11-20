@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { FilterParam, QueryParams, RybbitClient, pageRows, unwrapRows } from "../client.js";
 import { jsonResult, output } from "../response.js";
-import { analyticsInputSchema, bucketSchema, paginationSchema } from "../schemas.js";
+import { analyticsInputSchema, bucketSchema, limitSchema, paginationSchema } from "../schemas.js";
 
 interface EventRow {
   event_name?: string;
@@ -26,11 +26,11 @@ const eventRowShape = z
   .object({
     event_name: z.string().optional(),
     type: z.string().optional(),
-    properties: z.string().optional().describe("Raw JSON-encoded property bag"),
+    properties: z.string().optional().describe("Raw property JSON, present only when it could not be parsed"),
     properties_parsed: z
       .record(z.string(), z.unknown())
       .optional()
-      .describe("Same as `properties`, parsed into an object (added by MCP wrapper)"),
+      .describe("Event properties as an object"),
   })
   .passthrough();
 
@@ -48,8 +48,8 @@ const listEventsOutput = {
 };
 
 /**
- * Parse the raw `properties` JSON string into `properties_parsed`. Mutates
- * each row in place. Kept lenient — invalid JSON just leaves the field unset.
+ * Replaces the raw `properties` JSON string with the parsed `properties_parsed`
+ * object, in place. A string that is not valid JSON is left as it is.
  */
 function attachParsedProperties(rows: EventRow[] | undefined): void {
   if (!rows) return;
@@ -58,8 +58,9 @@ function attachParsedProperties(rows: EventRow[] | undefined): void {
     if (typeof raw !== "string" || raw === "" || raw === "{}") continue;
     try {
       row.properties_parsed = JSON.parse(raw) as Record<string, unknown>;
+      delete row.properties;
     } catch {
-      // ignore — leave properties_parsed unset
+      // not JSON: the raw string stays
     }
   }
 }
@@ -114,7 +115,9 @@ const eventPropertiesOutput = {
         })
         .passthrough()
     )
-    .optional(),
+    .optional()
+    .describe("Property key/value pairs, most frequent first"),
+  totalCount: z.number().optional().describe("Key/value pairs in the range, across all pages"),
 };
 
 const eventTimeseriesOutput = {
@@ -219,7 +222,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         "To page back through history pass the previous response's `cursor.oldestCursor` as beforeCursor; there is no page number.",
       inputSchema: {
         ...analyticsInputSchema,
-        limit: paginationSchema.limit,
+        limit: limitSchema(10),
         eventName: z
           .string()
           .optional()
@@ -250,7 +253,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
           ...rest,
           filters: withEventName(rest.filters, eventName),
         });
-        if (limit !== undefined) params.page_size = limit;
+        params.page_size = limit;
         if (beforeCursor) params.before_cursor = beforeCursor;
         if (beforeTimestamp) params.before_timestamp = beforeTimestamp;
         if (afterTimestamp) params.since_timestamp = afterTimestamp;
@@ -260,7 +263,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         let rows = data?.data ?? [];
         if (eventName) rows = rows.filter((e) => e.event_name === eventName);
         // since_timestamp ignores page_size.
-        if (afterTimestamp && limit !== undefined) rows = rows.slice(0, limit);
+        if (afterTimestamp) rows = rows.slice(0, limit);
         attachParsedProperties(rows);
 
         return jsonResult({ ...data, data: rows });
@@ -616,10 +619,11 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
       title: "Event Properties",
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
       description:
-        "Get property breakdowns for a specific custom event. Returns the distinct property keys and values with counts.",
+        "Get property breakdowns for a specific custom event. Returns the distinct property key/value pairs with counts, most frequent first, 100 per page; `totalCount` says how many there are.",
       inputSchema: {
         ...analyticsInputSchema,
         eventName: z.string().describe("Event name to get properties for"),
+        ...paginationSchema(100),
       },
       outputSchema: output(eventPropertiesOutput),
       _meta: {
@@ -629,11 +633,13 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
     },
     async (args) => {
       try {
-        const params = client.buildAnalyticsParams(args);
+        const { page, limit, ...rest } = args;
+        const params = client.buildAnalyticsParams(rest);
         params.event_name = args.eventName;
         const data = await client.get(`/sites/${args.siteId}/events/properties`, params);
-        const wrapped = Array.isArray(data) ? { data } : (data as Record<string, unknown>);
-        return jsonResult(wrapped);
+        // The endpoint returns every key/value pair and has no limit parameter.
+        const rows = unwrapRows(data).rows.sort((a, b) => Number(b.count) - Number(a.count));
+        return jsonResult(pageRows(rows, page, limit));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -687,7 +693,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         "Returns 100 links per page by default; `totalCount` says how many there are.",
       inputSchema: {
         ...analyticsInputSchema,
-        ...paginationSchema,
+        ...paginationSchema(100),
       },
       outputSchema: output(outboundLinksOutput),
       _meta: {
@@ -702,7 +708,7 @@ export function registerEventsTools(server: McpServer, client: RybbitClient): vo
         const data = await client.get(`/sites/${args.siteId}/events/outbound`, params);
         // The endpoint returns up to 1000 links and has no limit parameter.
         const rows = unwrapRows(data).rows.sort((a, b) => Number(b.count) - Number(a.count));
-        return jsonResult(pageRows(rows, page ?? 1, limit ?? 100));
+        return jsonResult(pageRows(rows, page, limit));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
