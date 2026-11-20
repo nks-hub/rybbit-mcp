@@ -11,14 +11,14 @@
 
 ## Features
 
-- 🧰 **32 analytics tools** - Overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys and site management
+- 🧰 **43 analytics tools** - Overview, metrics, sessions, users, events, errors, performance, funnels, goals, journeys and site management
 - 🔐 **Authentication** - API key (recommended) or email and password
 - 🔍 **Filtering** - Filter by 22 dimensions (browser, country, UTM, page, device, etc.) with 8 comparison types
 - 📅 **Time ranges** - Date ranges (`YYYY-MM-DD`) or relative time (`pastMinutesStart`)
-- 📈 **Time series** - Bucket size from one minute to one year
-- 📄 **Pagination** - `page` and `limit` parameters for large result sets
-- ✂️ **Response truncation** - Cuts responses at 25k characters so they fit the model context
-- 💡 **Error messages** - Tell the model what to try next, e.g. narrow the date range or call `rybbit_list_sites` for valid IDs
+- 📈 **Time series** - Daily buckets by default, any size from one minute to one year
+- 📄 **Pagination** - `page` and `limit` with a per-tool default sized to about 10k characters; `totalCount` reports how many rows exist
+- ✂️ **Response truncation** - A result over 16k characters loses rows from the end and says so in `truncated` and `note`; text and `structuredContent` carry the same JSON
+- 💡 **Error messages** - Pass on what the server rejected ("Goal not found") and what to try next, e.g. call `rybbit_list_sites` for valid IDs
 
 ## Requirements
 
@@ -100,7 +100,7 @@ Once the server is configured, Claude Code can answer questions such as:
 
 Both require `RYBBIT_URL` pointing to your Rybbit instance.
 
-## Tools (32)
+## Tools (43)
 
 ### Configuration and site management
 | Tool | Description |
@@ -111,12 +111,15 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_delete_site` | Delete a site permanently |
 | `rybbit_get_site_id` | Look up site ID by domain name |
 | `rybbit_update_site_config` | Update site tracking config (IP, errors, replay, etc.) |
+| `rybbit_site_has_data` | Check whether a site has received any events |
+| `rybbit_get_page_titles` | Most viewed page titles with pageviews and sessions |
+| `rybbit_describe_dimension` | Which tools accept a filter dimension, with example values |
 
 ### Real-time and overview
 | Tool | Description |
 |------|-------------|
 | `rybbit_live_users` | Current active users count |
-| `rybbit_get_overview` | Aggregated metrics (sessions, pageviews, users, bounce rate, duration) |
+| `rybbit_get_overview` | Aggregated metrics (`sessions`, `pageviews`, `users`, `pages_per_session`, `bounce_rate`, `session_duration`) |
 | `rybbit_get_overview_timeseries` | Metrics as time-series with configurable buckets |
 | `rybbit_get_session_locations` | Geographic session data with coordinates for map visualization |
 
@@ -130,7 +133,7 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | Tool | Description |
 |------|-------------|
 | `rybbit_list_sessions` | Session list with filtering by IP, identified users, min duration, and pagination |
-| `rybbit_get_session` | Full session detail with events and user traits |
+| `rybbit_get_session` | One session with its event timeline, paged by `limit` and `offset` |
 
 ### Users
 | Tool | Description |
@@ -139,11 +142,14 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_get_user` | User detail with traits and activity |
 | `rybbit_get_user_traits` | Trait keys, values, or find users by trait |
 | `rybbit_get_user_event_breakdown` | Per-user event count breakdown |
+| `rybbit_get_user_session_count` | Sessions per day for one user |
 
 ### Events
 | Tool | Description |
 |------|-------------|
-| `rybbit_list_events` | Raw event records with filtering |
+| `rybbit_list_events` | Raw event records, newest first, paged by `beforeCursor` |
+| `rybbit_get_event_aggregate` | Event counts grouped by any event field, trait or property (scans up to `maxScan` events, 5000 by default, about 3 s) |
+| `rybbit_get_event_user_leaderboard` | Top users for one event |
 | `rybbit_get_event_names` | Custom event names and counts |
 | `rybbit_get_event_properties` | Property breakdowns per event |
 | `rybbit_get_event_timeseries` | Event count trends over time with configurable buckets |
@@ -166,8 +172,13 @@ Both require `RYBBIT_URL` pointing to your Rybbit instance.
 | `rybbit_list_funnels` | Saved funnels with step definitions |
 | `rybbit_analyze_funnel` | Ad-hoc funnel analysis with custom steps |
 | `rybbit_get_funnel_step_sessions` | Sessions that reached or dropped off at a funnel step |
+| `rybbit_create_funnel` | Save a named funnel |
+| `rybbit_delete_funnel` | Delete a saved funnel |
 | `rybbit_list_goals` | Goals with conversion metrics |
 | `rybbit_get_goal_sessions` | Sessions that completed a specific goal |
+| `rybbit_create_goal` | Create a path or event goal |
+| `rybbit_update_goal` | Change a goal's name, type or configuration |
+| `rybbit_delete_goal` | Delete a goal |
 
 ### Journeys
 | Tool | Description |
@@ -186,6 +197,7 @@ All analytics tools support these optional parameters:
 | `timeZone` | string | IANA timezone (e.g., `Europe/Prague`) |
 | `filters` | array | Filter array `[{parameter, type, value[]}]` |
 | `pastMinutesStart` | number | Minutes ago (alternative to date range) |
+| `pastMinutesEnd` | number | End of the relative range in minutes ago (default 0, now) |
 
 ### Filter parameters
 
@@ -220,6 +232,9 @@ npm run dev
 
 # Type checking
 npx tsc --noEmit
+
+# Tests (builds first, then runs node:test against a stubbed Rybbit API)
+npm test
 ```
 
 ## Contributing

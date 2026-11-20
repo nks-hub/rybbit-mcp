@@ -1,6 +1,6 @@
 ---
 name: rybbit-mcp
-description: "MCP server for Rybbit Analytics — privacy-first, open-source web analytics platform. Provides 31 tools for querying website traffic, page views, sessions, users, bounce rates, conversions, funnels, goals, custom events, JavaScript errors, Core Web Vitals performance metrics (LCP, CLS, INP, FCP, TTFB), user journeys, retention cohorts, outbound links, session replay, geographic locations, and real-time visitor counts. Use whenever the user mentions web analytics, traffic analysis, visitors, page views, bounce rates, conversions, user tracking, performance metrics, website statistics, error tracking, funnel analysis, goal tracking, user behavior, session recordings, or any website measurement data."
+description: "MCP server for Rybbit Analytics — privacy-first, open-source web analytics platform. Provides 43 tools for querying website traffic, page views, sessions, users, bounce rates, conversions, funnels, goals, custom events, JavaScript errors, Core Web Vitals performance metrics (LCP, CLS, INP, FCP, TTFB), user journeys, retention cohorts, outbound links, session replay, geographic locations, and real-time visitor counts. Use whenever the user mentions web analytics, traffic analysis, visitors, page views, bounce rates, conversions, user tracking, performance metrics, website statistics, error tracking, funnel analysis, goal tracking, user behavior, session recordings, or any website measurement data."
 ---
 
 # Rybbit Analytics MCP Server
@@ -9,7 +9,7 @@ description: "MCP server for Rybbit Analytics — privacy-first, open-source web
 
 **Rybbit** is a privacy-first, open-source web analytics platform — a self-hosted alternative to Google Analytics. Data is stored in ClickHouse + PostgreSQL. Tracking is done via a JavaScript snippet, TypeScript SDK (`@nks-hub/rybbit-ts`), or Flutter SDK (`rybbit_flutter_sdk`).
 
-This MCP server exposes **31 tools** that let Claude query any Rybbit Analytics instance directly — no dashboard needed. Claude can retrieve traffic overviews, drill into sessions and users, analyze funnels and goals, investigate errors, audit Core Web Vitals performance, track custom events, and manage sites.
+This MCP server exposes **43 tools** that let Claude query any Rybbit Analytics instance directly — no dashboard needed. Claude can retrieve traffic overviews, drill into sessions and users, analyze funnels and goals, investigate errors, audit Core Web Vitals performance, track custom events, and manage sites.
 
 **Package**: `@nks-hub/rybbit-mcp` v0.5.2
 **Stack**: TypeScript, `@modelcontextprotocol/sdk` v1.27+, Zod, Node.js 18+
@@ -102,7 +102,7 @@ List all sites and organizations the authenticated user has access to.
 |-----------|------|----------|-------------|
 | *(none)* | — | — | No parameters |
 
-**Returns**: Array of organizations, each containing `sites[]` with `{ id, domain, name, organizationId }`.
+**Returns**: `{ data, totalCount }`. `data` is the list of organizations `{ id, name, role, sites[] }`, each site `{ id, domain, name, public, blockBots, saltUserIds }`; `totalCount` is the number of sites.
 
 **Use case**: Discover site IDs before querying analytics. This is always the first step.
 
@@ -118,7 +118,7 @@ Create a new site in Rybbit.
 | `organizationId` | string | Yes | Organization ID (from `rybbit_list_sites`) |
 | `type` | `"web"` \| `"mobile"` \| `"app"` | No | Site type. Default: `web`. `mobile` is canonical; `app` is a legacy alias mapped to `mobile`. Mobile sites auto-disable blockBots. |
 
-**Returns**: `{ message, siteId, domain, name, organizationId }`
+**Returns**: `{ message, siteId, stringId, domain, name, organizationId }`. `siteId` is the numeric ID the other tools take; `stringId` is an opaque alias of the same site.
 
 **Use case**: Register a new website or mobile app for tracking.
 
@@ -131,7 +131,7 @@ Look up a site by domain name.
 |-----------|------|----------|-------------|
 | `domain` | string | Yes | Domain to search for (partial match supported) |
 
-**Returns**: `{ siteId, domain, name, organization }` or array if multiple matches.
+**Returns**: `{ matches: [{ siteId, domain, name, organization }] }`, plus `message` when nothing matched.
 
 **Use case**: Find the numeric site ID when you know the domain but not the ID.
 
@@ -158,7 +158,7 @@ Update configuration for an existing site.
 | `sessionReplay` | boolean | No | Enable session replay recording |
 | `webVitals` | boolean | No | Track Core Web Vitals metrics |
 
-**Returns**: `{ success, config }` with updated configuration.
+**Returns**: `{ success, message, config }` with updated configuration.
 
 **Use case**: Enable/disable tracking features for a site.
 
@@ -205,7 +205,7 @@ Get aggregated overview metrics for a site.
 | `pastMinutesStart` | number | No | Minutes ago start (e.g., 60 = last hour) |
 | `pastMinutesEnd` | number | No | Minutes ago end (default 0 = now) |
 
-**Returns**: `{ sessions, pageviews, users, pagesPerSession, bounceRate, avgSessionDuration }`
+**Returns**: `{ sessions, pageviews, users, pages_per_session, bounce_rate, session_duration }`. The last three are `null` when the range has no sessions. A range whose `endDate` is before `startDate` is rejected.
 
 **Use case**: Quick site health check — the first analytics query after getting a site ID.
 
@@ -246,7 +246,7 @@ Get geographic session location data with coordinates.
 | `page` | number | No | Page number, 1-indexed (default: 1) |
 | `limit` | number | No | Results per page (max 200) |
 
-**Returns**: Array of `{ latitude, longitude, city, country, sessionCount }`.
+**Returns**: `{ data: [{ lat, lon, city, country, count }], totalCount }`, busiest location first, 100 per page.
 
 **Use case**: Geographic analysis and map visualization of visitor origins.
 
@@ -278,7 +278,7 @@ Get metric breakdown by dimension.
 - **Marketing**: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`
 - **Other**: `hostname`, `querystring`, `event_name`
 
-**Returns**: Array of `{ value, count, percentage, bounceRate, timeOnPage }`.
+**Returns**: `{ data: [{ value, count, percentage, pageviews, pageviews_percentage, bounce_rate, time_on_page_seconds }], totalCount }`, 50 rows per page.
 
 **Use case**: Top pages, browser distribution, country breakdown, traffic source analysis, UTM campaign performance.
 
@@ -323,7 +323,7 @@ List sessions with filtering and pagination.
 | `identifiedOnly` | boolean | No | Only return sessions from identified users |
 | `minDuration` | number | No | Minimum session duration in seconds |
 
-**Returns**: Array of session summaries with `{ sessionId, userId, device, country, city, pagesVisited, duration, bounced }`.
+**Returns**: `{ data }`, 10 sessions per page, each with `session_id`, `user_id`, `identified_user_id`, device and location fields, `entry_page`, `exit_page`, `pageviews`, `events`, `session_duration` (seconds) and `ip`.
 
 **Use case**: Browse recent sessions, find sessions by IP, filter to identified users only.
 
@@ -337,7 +337,7 @@ Get full session detail with all events.
 | `siteId` | string/number | Yes | Site ID |
 | `sessionId` | string | Yes | Session ID (from `rybbit_list_sessions`) |
 
-**Returns**: `{ sessionId, userId, traits, device, browser, os, country, region, city, events[] }` with full event timeline.
+**Returns**: `{ session, events, pagination }`. `events` is the timeline, oldest first, 25 per call; page through a long session with `limit` and `offset` (`pagination.total` is the event count).
 
 **Use case**: Deep-dive into a specific session to see the complete user journey, pages visited, and events fired.
 
@@ -365,7 +365,7 @@ List users for a site with session counts and traits.
 | `sortBy` | string | No | Sort field: `first_seen`, `last_seen`, `pageviews`, `sessions`, `events`, `duration`. Default: `last_seen`. `duration` aggregates from sessions and requires date range. |
 | `sortOrder` | string | No | `asc` or `desc`. Default: `desc` |
 
-**Returns**: Array of user objects with IDs, session counts, first/last seen dates, and traits.
+**Returns**: `{ data, totalCount, page, pageSize }`, 15 users per page, each with IDs, session counts, first/last seen dates, and traits.
 
 **Use case**: Find specific users, list most active users, sort by engagement.
 
@@ -379,7 +379,7 @@ Get detailed information about a specific user.
 | `siteId` | string/number | Yes | Site ID |
 | `userId` | string | Yes | User ID (`identified_user_id` or internal `user_id`) |
 
-**Returns**: User details with traits, session history, and activity summary.
+**Returns**: The user at the top level: IDs, `traits`, totals (`sessions`, `pageviews`, `events`, `duration`), `first_seen`, `last_seen`, `locations[]`, `devices[]` and `linked_devices[]`.
 
 **Use case**: Deep-dive into a specific user's behavior and traits.
 
@@ -394,9 +394,9 @@ Get user trait keys, values, or find users by trait.
 | `mode` | string | No | `keys` (list trait keys), `values` (values for a key), `users` (find users by key+value). Default: `keys` if no key, `values` if key given. |
 | `key` | string | No | Trait key (required for `values` and `users` modes) |
 | `value` | string | No | Trait value (required for `users` mode). Case-insensitive matching. |
-| `limit` | number | No | Max results to return |
+| `limit` | number | No | Max values or users to return (default 25, max 200) |
 
-**Returns**: Depends on mode — trait keys list, values list, or matching users.
+**Returns**: Depends on mode: `{ keys }`, `{ values, total, hasMore }` or `{ users, total, hasMore }`. `mode="values"` without `key`, or `mode="users"` without `key` and `value`, is an error.
 
 **Use case**: Discover what user traits are tracked, find users by trait (e.g., all users with `plan=premium`).
 
@@ -436,11 +436,13 @@ List raw events with filtering and pagination.
 | `filters` | array | No | Filter array |
 | `pastMinutesStart` | number | No | Minutes ago start |
 | `pastMinutesEnd` | number | No | Minutes ago end |
-| `page` | number | No | Page number (default: 1) |
-| `limit` | number | No | Results per page (max 200) |
-| `eventName` | string | No | Filter to only this event name (e.g., `ad_click`). More precise than filters array. |
+| `limit` | number | No | Events per call (default 10, max 200) |
+| `eventName` | string | No | Only this event name (e.g., `ad_click`) |
+| `beforeCursor` | string | No | `cursor.oldestCursor` of the previous response; returns the next older page |
+| `beforeTimestamp` | string | No | Only events strictly older than this UTC timestamp; events in the same second are skipped |
+| `afterTimestamp` | string | No | Only events strictly newer than this UTC timestamp (latest 500, no cursor) |
 
-**Returns**: `{ data: [{ event_name, type, pathname, timestamp, ... }], cursor }`.
+**Returns**: `{ data: [{ event_name, type, pathname, timestamp, properties_parsed, ... }], cursor: { hasMore, oldestTimestamp, oldestCursor } }`, newest first. There is no page number; page back with `beforeCursor`.
 
 **Use case**: Browse raw event data, find specific event occurrences.
 
@@ -459,7 +461,7 @@ Get all custom event names and their counts.
 | `pastMinutesStart` | number | No | Minutes ago start |
 | `pastMinutesEnd` | number | No | Minutes ago end |
 
-**Returns**: Array of `{ event_name, count }`.
+**Returns**: `{ data: [{ eventName, count }] }`.
 
 **Use case**: Discover what custom events are being tracked on a site.
 
@@ -479,7 +481,7 @@ Get property breakdowns for a specific custom event.
 | `pastMinutesStart` | number | No | Minutes ago start |
 | `pastMinutesEnd` | number | No | Minutes ago end |
 
-**Returns**: Property keys and values with counts for the specified event.
+**Returns**: `{ data: [{ propertyKey, propertyValue, count }], totalCount }`, most frequent first, 100 per page.
 
 **Use case**: Analyze event metadata — e.g., `ad_click` properties like `ad_position`, `ad_type`, `campaign_id`.
 
@@ -499,7 +501,7 @@ Get custom event counts as time-series data.
 | `pastMinutesEnd` | number | No | Minutes ago end |
 | `bucket` | string | No | Time bucket: `minute`, `five_minutes`, `ten_minutes`, `fifteen_minutes`, `hour`, `day`, `week`, `month`, `year` |
 
-**Returns**: Array of time-bucketed event counts.
+**Returns**: `{ data: [{ time, event_name, event_count }] }`, one row per event name and bucket (daily unless `bucket` is set).
 
 **Use case**: Track event trends over time — are `signup` events increasing this week?
 
@@ -520,7 +522,7 @@ Get outbound link clicks tracked on the site.
 | `page` | number | No | Page number (default: 1) |
 | `limit` | number | No | Results per page (max 200) |
 
-**Returns**: Array of outbound link URLs with click counts.
+**Returns**: `{ data: [{ url, count, lastClicked }], totalCount }`, most clicked first, 100 per page. The server reports at most 1000 links.
 
 **Use case**: Which external links are users clicking? Are affiliate links performing?
 
@@ -547,9 +549,9 @@ Get error tracking data. Three modes: names, events, timeseries.
 | `limit` | number | No | Results per page (max 200) |
 
 **Returns** (depends on type):
-- `names`: Array of `{ name, count }`
-- `events`: Array of `{ id, name, message, stack }`
-- `timeseries`: Array of time-bucketed error counts
+- `names`: `{ data: [{ value, errorName, count, sessionCount, percentage }], totalCount }`; `value` is the message to pass as `errorMessage`
+- `events`: `{ data: [{ timestamp, session_id, pathname, message, stack, ... }] }`
+- `timeseries`: `{ data: [{ time, error_count }] }`, daily unless `bucket` is set
 
 **Workflow**:
 1. `type="names"` — discover error types and how often they occur
@@ -577,8 +579,8 @@ Get Core Web Vitals with percentiles.
 | `pastMinutesEnd` | number | No | Minutes ago end |
 
 **Returns**:
-- `overview`: `{ lcp_p50, lcp_p75, lcp_p90, lcp_p99, cls_p50, cls_p75, ..., inp_*, fcp_*, ttfb_* }`
-- `pathname`/`browser`/`operating_system`: Array broken down by that dimension
+- `overview`: `{ lcp_p50, lcp_p75, lcp_p90, lcp_p99, lcp_count, lcp_good, lcp_poor, ... }` and the same seven fields for `cls`, `inp`, `fcp`, `ttfb`, plus `total_performance_events`. Percentiles are `null` when the range has no samples.
+- `pathname`/`browser`/`operating_system`: `{ data, totalCount }` broken down by that dimension, 50 rows per page (`page`, `limit`)
 
 **Metrics explained:**
 - **LCP** (Largest Contentful Paint): Loading — good < 2.5s
@@ -649,7 +651,7 @@ Analyze a custom funnel with ad-hoc steps.
 ]
 ```
 
-**Returns**: `{ steps: [{ name, count, dropoff, dropoffRate }] }`.
+**Returns**: `{ data: [{ step_number, step_name, sessions, visitors, conversion_rate, dropoff_rate }] }`, one row per step.
 
 **Use case**: Conversion funnel analysis — where do users drop off between homepage and signup?
 
@@ -694,7 +696,7 @@ List all goals with current conversion metrics.
 | `pastMinutesStart` | number | No | Minutes ago start |
 | `pastMinutesEnd` | number | No | Minutes ago end |
 
-**Returns**: Array of `{ id, name, type, value, conversions, conversionRate }`.
+**Returns**: `{ data: [{ goalId, name, goalType, config, total_conversions, total_sessions, conversion_rate }], totalCount }`, 25 goals per page (`page`, `limit`, at most 100).
 
 **Use case**: Check goal conversion rates and performance.
 
@@ -739,7 +741,7 @@ Get user journey (navigation path) analysis.
 | `steps` | number | No | Number of journey steps to analyze (2-10, default: 3) |
 | `journeyLimit` | number | No | Max journey paths to return (default: 100) |
 
-**Returns**: Array of `{ path: string[], sessions, percentage }`.
+**Returns**: `{ data: [{ path: string[], count, percentage }], totalSessions }`.
 
 **Use case**: What are the most common navigation paths? Where do users go after the homepage?
 
@@ -866,6 +868,7 @@ Common patterns:
 | Yesterday | 2880 | 1440 |
 
 ### Interaction Rules
+- `pastMinutesStart` without `pastMinutesEnd` means "until now".
 - If both absolute dates and relative time are provided, the API accepts both but behavior may vary per endpoint.
 - Use absolute dates for specific date ranges.
 - Use relative time for "last N minutes/hours" queries.
@@ -971,11 +974,10 @@ For timeseries endpoints, the `bucket` parameter controls granularity:
 ## 8. Tips & Gotchas
 
 ### Response Truncation
-- Responses are auto-truncated at **25,000 characters** to prevent context window bloat.
-- If data is an array, it is halved (keeping the first N items).
-- If data is an object, it is sliced at the character limit.
-- Truncated responses include a `truncation_message` field.
-- **Workaround**: Use `page`/`limit` pagination or add filters to reduce data before it gets truncated.
+- Every result carries the same JSON twice, as text and as `structuredContent`.
+- A result over **16,000 characters** is shortened: rows are dropped from the end of its largest list until it fits, and `truncated: true` plus `note` ("Showing 14 of the 200 rows in 'data' ...") are added.
+- A result with no list to shorten comes back as `{ truncated, note, partial }`, where `partial` is the beginning of the raw JSON.
+- Default page sizes keep a default call near 10,000 characters, so truncation mostly follows an explicit large `limit` or an hourly bucket over a long range.
 
 ### Request Timeout
 - All API requests have a **30-second timeout** (AbortController).
@@ -983,16 +985,17 @@ For timeseries endpoints, the `bucket` parameter controls granularity:
 - **Fix**: Narrow the date range, add filters, or reduce the limit.
 
 ### Pagination
-- Default page size is 20 (endpoint-dependent, some default to 50).
+- Each tool has its own default `limit`, chosen by row size: 10 for sessions and events, 15 for users, 50 for metric rows, 100 for locations, outbound links and event properties.
 - Maximum page size is **200**.
-- `page` is 1-indexed.
+- `page` is 1-indexed. `rybbit_list_events` has no pages; it uses `beforeCursor`.
+- List results carry `totalCount` where the server reports a total or the tool pages the full list itself.
 - For IP filtering on sessions, the tool fetches up to 2000 sessions internally in batches of 200.
 
 ### Known Quirks
 
-1. **`event_name` filter on `rybbit_list_users` is auto-stripped** — the backend crashes (HTTP 500) when applying event_name filter to the users endpoint. The MCP server removes it silently and adds a warning. Use `rybbit_get_user_event_breakdown` instead.
+1. **`event_name` filter on `rybbit_list_users` is auto-stripped** — the backend crashes (HTTP 500) when applying event_name filter to the users endpoint. The MCP server removes it and says so in `note`. Use `rybbit_get_event_user_leaderboard` instead.
 
-2. **`event_name` filter on `rybbit_list_events` returns session-level data** — the backend fetches entire sessions matching the event. The MCP server applies client-side post-filtering when `eventName` parameter is used (more precise than filters array).
+2. **`eventName` on `rybbit_list_events`, `rybbit_get_event_aggregate` and `rybbit_get_event_user_leaderboard`** is sent to the server as an `event_name` filter, so pages contain only matching events. The aggregate and leaderboard tools read events in pages of 1000 with the keyset cursor: about 3 s for the default `maxScan` of 5000, about 20 s for 50000.
 
 3. **`user_id` filter checks both IDs** — the backend's `user_id` filter checks both the device hash (`user_id`) and the app-provided ID (`identified_user_id`). This is intentional but not obvious from the parameter name.
 
@@ -1007,7 +1010,6 @@ For timeseries endpoints, the `bucket` parameter controls granularity:
 8. **Mobile sites auto-disable blockBots** — when creating a site with `type="mobile"` (or the legacy alias `type="app"`), `blockBots` is automatically disabled because Flutter/Dart HTTP user agents are detected as bots.
 
 ### Constants
-- `CHARACTER_LIMIT`: 25,000 chars
+- `CHARACTER_LIMIT`: 16,000 chars
 - `REQUEST_TIMEOUT_MS`: 30,000 ms (30s)
-- `DEFAULT_PAGE_SIZE`: 20
 - `MAX_PAGE_SIZE`: 200
