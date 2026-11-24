@@ -25,7 +25,7 @@ const performanceOutput = {
   // Dimension breakdown rows (when dimension=pathname/browser/operating_system)
   data: z
     .array(
-      z.record(z.unknown())
+      z.record(z.string(), z.unknown())
     )
     .optional()
     .describe("Per-dimension rows when dimension!=overview"),

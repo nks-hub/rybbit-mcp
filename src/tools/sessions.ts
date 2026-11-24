@@ -44,7 +44,7 @@ const sessionDetailOutput = {
           type: z.string().nullish().describe("pageview, custom_event, outbound, ..."),
           pathname: z.string().nullish(),
           event_name: z.string().nullish(),
-          props: z.record(z.unknown()).nullish(),
+          props: z.record(z.string(), z.unknown()).nullish(),
         })
         .passthrough()
     )

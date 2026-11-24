@@ -90,7 +90,7 @@ const getSiteIdOutput = {
 const updateSiteConfigOutput = {
   success: z.boolean().optional(),
   message: z.string().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 };
 
 const deleteSiteOutput = {

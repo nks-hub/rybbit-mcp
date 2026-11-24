@@ -10,7 +10,7 @@ const goalShape = z
     goalId: z.number().nullish(),
     name: z.string().nullish(),
     goalType: z.string().nullish().describe("path or event"),
-    config: z.record(z.unknown()).nullish(),
+    config: z.record(z.string(), z.unknown()).nullish(),
     total_conversions: z.number().nullish(),
     total_sessions: z.number().nullish(),
     conversion_rate: z.number().nullish(),
@@ -23,7 +23,7 @@ const listGoalsOutput = {
 };
 
 const goalSessionsOutput = {
-  data: z.array(z.record(z.unknown())).optional().describe("Sessions that hit the goal"),
+  data: z.array(z.record(z.string(), z.unknown())).optional().describe("Sessions that hit the goal"),
 };
 
 const goalMutationOutput = {

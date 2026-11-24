@@ -34,7 +34,7 @@ interface AggregatedUser {
 
 // Output schemas
 const listUsersOutput = {
-  data: z.array(z.record(z.unknown())).optional().describe("User rows"),
+  data: z.array(z.record(z.string(), z.unknown())).optional().describe("User rows"),
   totalCount: z.number().optional().describe("Users matching the query, across all pages"),
   page: z.number().optional(),
   pageSize: z.number().optional(),
@@ -49,9 +49,9 @@ const userDetailOutput = {
   duration: z.number().nullish().describe("Total session time in seconds"),
   first_seen: z.string().nullish(),
   last_seen: z.string().nullish(),
-  traits: z.record(z.unknown()).nullish(),
+  traits: z.record(z.string(), z.unknown()).nullish(),
   linked_devices: z
-    .array(z.record(z.unknown()))
+    .array(z.record(z.string(), z.unknown()))
     .optional()
     .describe("Anonymous device ids merged into this user"),
 };
@@ -77,7 +77,7 @@ const userTraitsOutput = {
     .array(z.object({ value: z.string().nullish(), userCount: z.number().nullish() }).passthrough())
     .optional()
     .describe("mode=values: distinct values of the trait"),
-  users: z.array(z.record(z.unknown())).optional().describe("mode=users: users having the trait value"),
+  users: z.array(z.record(z.string(), z.unknown())).optional().describe("mode=users: users having the trait value"),
   total: z.number().optional().describe("Values or users matching, across all pages"),
   hasMore: z.boolean().optional(),
 };

@@ -58,7 +58,7 @@ const analyzeFunnelOutput = {
 };
 
 const funnelStepSessionsOutput = {
-  data: z.array(z.record(z.unknown())).optional().describe("Sessions for the step"),
+  data: z.array(z.record(z.string(), z.unknown())).optional().describe("Sessions for the step"),
 };
 
 const createFunnelOutput = {

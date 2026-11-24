@@ -12,12 +12,12 @@ import { z } from "zod";
 
 /** Generic "data wrapper" response — most analytics endpoints return { data: [...] } */
 export const dataWrapperOutput = {
-  data: z.array(z.record(z.unknown())).optional().describe("Result rows"),
+  data: z.array(z.record(z.string(), z.unknown())).optional().describe("Result rows"),
 };
 
 /** Plain array of records — wrapped under `data` for structuredContent compatibility */
 export const arrayResultOutput = {
-  data: z.array(z.record(z.unknown())).describe("Result rows"),
+  data: z.array(z.record(z.string(), z.unknown())).describe("Result rows"),
 };
 
 /** Pagination cursor info that some endpoints emit */
